@@ -1,0 +1,345 @@
+{
+  parserClass="com.github.themirachathumina.golangintellijcommunity.parser.GoParser"
+  elementTypeHolderClass="com.github.themirachathumina.golangintellijcommunity.psi.GoTypes"
+  elementTypeClass="com.github.themirachathumina.golangintellijcommunity.GoElementType"
+  tokenTypeClass="com.github.themirachathumina.golangintellijcommunity.GoTokenType"
+  psiClassPrefix="Go"
+  psiImplClassSuffix="Impl"
+  psiPackage="com.github.themirachathumina.golangintellijcommunity.psi"
+  psiImplPackage="com.github.themirachathumina.golangintellijcommunity.psi.impl"
+
+  tokens =[
+    // Comments
+    LINE_COMMENT='regexp://.*'
+    BLOCK_COMMENT='regexp:/\*(.|\n)*\*/'
+
+    // Punctuation and Operators
+    LBRACE="{"
+    RBRACE="}"
+    LBRACK="["
+    RBRACK="]"
+    LPAREN="("
+    RPAREN=")"
+    COLON=":"
+    SEMICOLON=";"
+    COMMA=","
+    DOT="."
+    ELLIPSIS="..."
+
+    EQ="="
+    ASSIGN=":="
+    EQEQ="=="
+    NEQ="!="
+    LESS_EQ="<="
+    GREATER_EQ=">="
+    LESS="<"
+    GREATER=">"
+    COND_OR="||"
+    COND_AND="&&"
+    SEND_CHANNEL="<-"
+    PLUS_PLUS="++"
+    MINUS_MINUS="--"
+    SHIFT_LEFT="<<"
+    SHIFT_RIGHT=">>"
+    BIT_CLEAR="&^"
+    PLUS="+"
+    MINUS="-"
+    BIT_OR="|"
+    BIT_XOR="^"
+    MUL="*"
+    QUOTIENT="/"
+    REMAINDER="%"
+    BIT_AND="&"
+    NOT="!"
+    TILDE="~"
+
+    // Keywords
+    PACKAGE_KW="package"
+    IMPORT_KW="import"
+    FUNC_KW="func"
+    TYPE_KW="type"
+    VAR_KW="var"
+    CONST_KW="const"
+    STRUCT_KW="struct"
+    INTERFACE_KW="interface"
+    MAP_KW="map"
+    CHAN_KW="chan"
+    GO_KW="go"
+    DEFER_KW="defer"
+    RETURN_KW="return"
+    BREAK_KW="break"
+    CONTINUE_KW="continue"
+    GOTO_KW="goto"
+    FALLTHROUGH_KW="fallthrough"
+    IF_KW="if"
+    ELSE_KW="else"
+    SWITCH_KW="switch"
+    CASE_KW="case"
+    DEFAULT_KW="default"
+    SELECT_KW="select"
+
+    FOR_KW="for"
+    RANGE_KW="range"
+
+    // Default Token Regexes
+    identifier='regexp:[a-zA-Z_][a-zA-Z0-9_]*'
+    string_lit='regexp:("([^"\\]|\\.)*")|(`[^`]*`)'
+    int_lit='regexp:(0[bB][01_]+)|(0[oO][0-7_]+)|(0[xX][0-9a-fA-F_]+)|([0-9][0-9_]*)'
+    float_lit='regexp:[0-9_]*\.[0-9_]*([eE][+-]?[0-9_]+)?'
+    imaginary_lit='regexp:([0-9_]+|[0-9_]*\.[0-9_]*([eE][+-]?[0-9_]+)?)[iI]'
+    rune_lit="regexp:'([^'\\]|\\.)*'"
+  ]
+}
+
+/* ------------------------------------------------------------------- */
+/* Source File Organization & Error Recovery                           */
+/* ------------------------------------------------------------------- */
+goFile ::= SourceFile
+
+// RECOVERY FIX: Wraps top-level items in private rules with recoverWhile
+SourceFile ::= package_clause_item import_item* top_level_item*
+
+private package_clause_item ::= PackageClause ( ";" )? {recoverWhile=top_level_recover}
+private import_item ::= ImportDecl ( ";" )? {recoverWhile=top_level_recover}
+private top_level_item ::= TopLevelDecl ( ";" )? {recoverWhile=top_level_recover}
+
+// Skip tokens until we hit one of these safe top-level starting keywords
+private top_level_recover ::= !("package" | "import" | "func" | "var" | "const" | "type")
+
+PackageClause ::= "package" PackageName {pin=1}
+PackageName ::= identifier
+
+ImportDecl ::= "import" ( ImportSpec | "(" ( ImportSpec ";" )* ")" ) {pin=1}
+ImportSpec ::= ( "." | PackageName )? ImportPath
+ImportPath ::= string_lit
+
+TopLevelDecl ::= Declaration | FunctionDecl | MethodDecl
+Declaration ::= ConstDecl | TypeDecl | VarDecl
+
+/* ------------------------------------------------------------------- */
+/* Declarations                                                        */
+/* ------------------------------------------------------------------- */
+// RECOVERY FIX: Pinned top level keywords so the parser strictly commits to them
+ConstDecl ::= "const" ( ConstSpec | "(" ( ConstSpec ";" )* ")" ) {pin=1}
+ConstSpec ::= IdentifierList ( ( Type )? "=" ExpressionList )?
+IdentifierList ::= identifier ( "," identifier )*
+ExpressionList ::= Expression ( "," Expression )*
+
+TypeDecl ::= "type" ( TypeSpec | "(" ( TypeSpec ";" )* ")" ) {pin=1}
+TypeSpec ::= AliasDecl | TypeDef
+AliasDecl ::= identifier ( TypeParameters )? "=" Type
+TypeDef ::= identifier ( TypeParameters )? Type
+
+TypeParameters ::= "[" TypeParamList ( "," )? "]"
+TypeParamList ::= TypeParamDecl ( "," TypeParamDecl )*
+TypeParamDecl ::= IdentifierList TypeConstraint
+TypeConstraint ::= TypeElem
+
+VarDecl ::= "var" ( VarSpec | "(" ( VarSpec ";" )* ")" ) {pin=1}
+VarSpec ::= IdentifierList ( Type ( "=" ExpressionList )? | "=" ExpressionList )
+
+ShortVarDecl ::= ExpressionList ":=" ExpressionList {pin=2}
+
+FunctionDecl ::= "func" FunctionName ( TypeParameters )? Signature ( FunctionBody )? {pin=2}
+FunctionName ::= identifier
+FunctionBody ::= Block
+
+MethodDecl ::= "func" Receiver MethodName Signature ( FunctionBody )? {pin=2}
+Receiver ::= Parameters
+
+/* ------------------------------------------------------------------- */
+/* Blocks & Statements & Block-Level Recovery                          */
+/* ------------------------------------------------------------------- */
+// FIX 1: Pinned Block prevents parser from backtracking out of empty {}
+Block ::= "{" StatementList "}" {pin=1}
+
+// FIX 2: Bulletproof StatementList with Block-Level Error Recovery
+StatementList ::= ( statement_item | ";" )*
+private statement_item ::= Statement {recoverWhile=statement_recover}
+
+// RECOVERY FIX: Skip garbled tokens until we hit a newline (;), the end of the block (}), or a switch case
+private statement_recover ::= !(";" | "}" | "case" | "default")
+
+Statement ::= Declaration | ReturnStmt | GoStmt | DeferStmt | IfStmt | ForStmt | SwitchStmt | SelectStmt | BreakStmt | ContinueStmt | GotoStmt | FallthroughStmt | Block | LabeledStmt | SimpleStmt
+
+SimpleStmt ::= ShortVarDecl | Assignment | SendStmt | IncDecStmt | ExpressionStmt
+
+SimpleStmtNoStruct ::= ShortVarDecl | Assignment | SendStmt | IncDecStmt | ExpressionStmtNoStruct
+ExpressionStmtNoStruct ::= ExpressionNoStruct
+
+LabeledStmt ::= Label ":" Statement
+Label ::= identifier
+
+ExpressionStmt ::= Expression
+
+SendStmt ::= Channel "<-" Expression
+Channel ::= Expression
+
+IncDecStmt ::= Expression ( "++" | "--" )
+
+Assignment ::= ExpressionList assign_op ExpressionList {pin=2}
+assign_op ::= ( add_op | mul_op )? "="
+
+// FIX 3: Pinned Control flow stabilizes the parser against cascading errors
+IfStmt ::= "if" ( SimpleStmtNoStruct ";" )? ExpressionNoStruct Block ( "else" ( IfStmt | Block ) )? {pin=1}
+ExprSwitchStmt ::= "switch" ( SimpleStmtNoStruct ";" )? ( ExpressionNoStruct )? "{" ExprCaseClause* "}" {pin=1}
+TypeSwitchStmt ::= "switch" ( SimpleStmtNoStruct ";" )? TypeSwitchGuard "{" TypeCaseClause* "}" {pin=3}
+
+SwitchStmt ::= TypeSwitchStmt | ExprSwitchStmt
+ExprCaseClause ::= ExprSwitchCase ":" StatementList
+ExprSwitchCase ::= "case" ExpressionList | "default"
+
+TypeSwitchGuard ::= ( identifier ":=" )? PrimaryExpr "." "(" "type" ")"
+TypeCaseClause ::= TypeSwitchCase ":" StatementList
+TypeSwitchCase ::= "case" TypeList | "default"
+TypeList ::= Type ( "," Type )*
+
+ForStmt ::= "for" ( RangeClause | ForClause | Condition )? Block {pin=1}
+Condition ::= ExpressionNoStruct
+ForClause ::= ( InitStmtNoStruct )? ";" ( Condition )? ";" ( PostStmtNoStruct )?
+InitStmtNoStruct ::= SimpleStmtNoStruct
+PostStmtNoStruct ::= SimpleStmtNoStruct
+
+RangeClause ::= ( ExpressionList ( "=" | ":=" ) )? "range" ExpressionNoStruct
+
+GoStmt ::= "go" Expression
+
+SelectStmt ::= "select" "{" CommClause* "}" {pin=1}
+CommClause ::= CommCase ":" StatementList
+CommCase ::= "case" ( SendStmt | RecvStmt ) | "default"
+RecvStmt ::= ( ExpressionList ( "=" | ":=" ) )? RecvExpr
+RecvExpr ::= Expression
+
+ReturnStmt ::= "return" ( ExpressionList )?
+BreakStmt ::= "break" ( Label )?
+ContinueStmt ::= "continue" ( Label )?
+GotoStmt ::= "goto" Label
+FallthroughStmt ::= "fallthrough"
+DeferStmt ::= "defer" Expression
+
+/* ------------------------------------------------------------------- */
+/* Types                                                               */
+/* ------------------------------------------------------------------- */
+Type ::= TypeName ( TypeArgs )? | TypeLit | "(" Type ")"
+
+TypeName ::= identifier ( "." identifier )?
+TypeArgs ::= "[" TypeList ( "," )? "]"
+
+TypeLit ::= ArrayType | StructType | PointerType | FunctionType | InterfaceType | SliceType | MapType | ChannelType
+
+ArrayType ::= "[" ArrayLength "]" ElementType
+ArrayLength ::= Expression
+ElementType ::= Type
+
+SliceType ::= "[" "]" ElementType
+
+StructType ::= "struct" "{" (FieldDecl ";"?)* "}"
+FieldDecl ::= ( IdentifierList Type | EmbeddedField ) ( Tag )?
+EmbeddedField ::= ( "*" )? TypeName ( TypeArgs )?
+Tag ::= string_lit
+
+PointerType ::= "*" BaseType
+BaseType ::= Type
+
+FunctionType ::= "func" Signature
+Signature ::= Parameters ( Result )?
+Result ::= Parameters | Type
+Parameters ::= "(" ( ParameterList ( "," )? )? ")"
+ParameterList ::= ParameterDecl ( "," ParameterDecl )*
+ParameterDecl ::= IdentifierList "..."? Type | "..."? Type
+
+InterfaceType ::= "interface" "{" ( InterfaceElem ";"? )* "}"
+InterfaceElem ::= MethodElem | TypeElem
+MethodElem ::= MethodName Signature
+MethodName ::= identifier
+TypeElem ::= TypeTerm ( "|" TypeTerm )*
+TypeTerm ::= Type | UnderlyingType
+UnderlyingType ::= "~" Type
+
+MapType ::= "map" "[" KeyType "]" ElementType
+KeyType ::= Type
+
+ChannelType ::= ReceiveChannelType | SendOrBidiChannelType
+ReceiveChannelType ::= "<-" "chan" Type {pin=2}
+SendOrBidiChannelType ::= "chan" "<-"? Type {pin=1}
+
+/* ------------------------------------------------------------------- */
+/* Expressions & Operands                                              */
+/* ------------------------------------------------------------------- */
+Operand ::= Literal | OperandName ( TypeArgs )? | "(" Expression ")"
+Literal ::= BasicLit | CompositeLit | FunctionLit
+BasicLit ::= int_lit | float_lit | imaginary_lit | rune_lit | StringLiteral
+
+StringLiteral ::= string_lit {
+    implements="com.intellij.psi.PsiLanguageInjectionHost"
+    mixin="com.github.themirachathumina.golangintellijcommunity.highlight.GoStringLiteralMixin"
+}
+
+OperandName ::= identifier ( "." identifier )?
+
+CompositeLit ::= LiteralType LiteralValue
+LiteralType ::= StructType | ArrayType | "[" "..." "]" ElementType | SliceType | MapType | TypeName ( TypeArgs )?
+LiteralValue ::= "{" ( ElementList ( "," )? )? "}"
+CompositeLitNoStruct ::= LiteralTypeNoStruct LiteralValue
+LiteralTypeNoStruct ::= StructType | ArrayType | "[" "..." "]" ElementType | SliceType | MapType
+ElementList ::= KeyedElement ( "," KeyedElement )*
+KeyedElement ::= ( Key ":" )? Element
+Key ::= FieldName | Expression | LiteralValue
+FieldName ::= identifier
+Element ::= Expression | LiteralValue
+
+FunctionLit ::= "func" Signature FunctionBody
+
+PrimaryExpr ::= PrimaryOperand PrimarySuffix*
+
+PrimaryOperand ::= Operand | Conversion | MethodExpr
+PrimarySuffix ::= Selector | Index | Slice | TypeAssertion | Arguments
+
+Selector ::= "." identifier
+Index ::= "[" Expression ( "," )? "]"
+Slice ::= "[" ( Expression )? ":" ( Expression )? "]" | "[" ( Expression )? ":" Expression ":" Expression "]"
+TypeAssertion ::= "." "(" Type ")"
+Arguments ::= "(" ( ( ExpressionList | Type ( "," ExpressionList )? ) ( "..." )? ( "," )? )? ")"
+
+MethodExpr ::= ReceiverType "." MethodName
+ReceiverType ::= Type
+MethodName ::= identifier
+Conversion ::= Type "(" Expression ( "," )? ")"
+
+/* ------------------------------------------------------------------- */
+/* Operators & Precedence                                              */
+/* ------------------------------------------------------------------- */
+Expression ::= LogicalOrExpr
+
+LogicalOrExpr ::= LogicalAndExpr ( "||" LogicalAndExpr )*
+LogicalAndExpr ::= RelationalExpr ( "&&" RelationalExpr )*
+RelationalExpr ::= AddExpr ( rel_op AddExpr )*
+AddExpr ::= MulExpr ( add_op MulExpr )*
+MulExpr ::= UnaryExpr ( mul_op UnaryExpr )*
+
+UnaryExpr ::= PrimaryExpr | unary_op UnaryExpr
+
+/* ------------------------------------------------------------------- */
+/* Expressions (No Struct) - Resolves Composite Literal Ambiguity      */
+/* ------------------------------------------------------------------- */
+ExpressionNoStruct ::= LogicalOrExprNoStruct
+
+LogicalOrExprNoStruct ::= LogicalAndExprNoStruct ( "||" LogicalAndExprNoStruct )*
+LogicalAndExprNoStruct ::= RelationalExprNoStruct ( "&&" RelationalExprNoStruct )*
+RelationalExprNoStruct ::= AddExprNoStruct ( rel_op AddExprNoStruct )*
+AddExprNoStruct ::= MulExprNoStruct ( add_op MulExprNoStruct )*
+MulExprNoStruct ::= UnaryExprNoStruct ( mul_op UnaryExprNoStruct )*
+
+UnaryExprNoStruct ::= PrimaryExprNoStruct | unary_op UnaryExprNoStruct
+PrimaryExprNoStruct ::= PrimaryOperandNoStruct PrimarySuffix*
+
+PrimaryOperandNoStruct ::= OperandNoStruct | Conversion | MethodExpr
+OperandNoStruct ::= BasicLit | CompositeLitNoStruct | FunctionLit | OperandName ( TypeArgs )? | "(" Expression ")"
+
+/* ------------------------------------------------------------------- */
+/* Operator Tokens                                                     */
+/* ------------------------------------------------------------------- */
+rel_op ::= "==" | "!=" | "<" | "<=" | ">" | ">="
+add_op ::= "+" | "-" | "|" | "^"
+mul_op ::= "*" | "/" | "%" | "<<" | ">>" | "&" | "&^"
+unary_op ::= "+" | "-" | "!" | "^" | "*" | "&" | "<-"

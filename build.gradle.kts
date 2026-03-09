@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.changelog) // Gradle Changelog Plugin
     alias(libs.plugins.qodana) // Gradle Qodana Plugin
     alias(libs.plugins.kover) // Gradle Kover Plugin
+    id("org.jetbrains.grammarkit") version "2023.3.0.2"
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -36,13 +37,13 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        intellijIdea(providers.gradleProperty("platformVersion"))
+        intellijIdeaCommunity(providers.gradleProperty("platformVersion"))
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
-        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
+        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') + "com.redhat.devtools.lsp4ij:0.19.2" })
 
         // Module Dependencies. Uses `platformBundledModules` property from the gradle.properties file for bundled IntelliJ Platform modules.
         bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',') })
@@ -132,6 +133,20 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
 
+    generateLexer {
+        sourceFile.set(file("src/main/kotlin/com/github/themirachathumina/golangintellijcommunity/_GoLexer.flex"))
+        targetOutputDir.set(layout.projectDirectory.dir("src/main/gen/com/github/themirachathumina/golangintellijcommunity"))
+        purgeOldFiles.set(true)
+    }
+
+    generateParser {
+        sourceFile.set(file("src/main/kotlin/com/github/themirachathumina/golangintellijcommunity/go.bnf"))
+        targetRootOutputDir.set(layout.projectDirectory.dir("src/main/gen"))
+        pathToParser.set("/com/github/themirachathumina/golangintellijcommunity/parser/GoParser.java")
+        pathToPsiRoot.set("/com/github/themirachathumina/golangintellijcommunity/psi")
+        purgeOldFiles.set(true)
+    }
+
     publishPlugin {
         dependsOn(patchChangelog)
     }
@@ -154,6 +169,14 @@ intellijPlatformTesting {
             plugins {
                 robotServerPlugin()
             }
+        }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs("src/main/gen")
         }
     }
 }

@@ -3,13 +3,52 @@
     <id>com.github.themirachathumina.golangintellijcommunity</id>
     <name>go-lang-intellij-community</name>
     <vendor>themirachathumina</vendor>
-
+    <incompatible-with>com.intellij.modules.ultimate</incompatible-with>
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.themirachathumina.golangintellijcommunity.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.themirachathumina.golangintellijcommunity.startup.MyProjectActivity" />
+        <fileType name="Go File"
+                  implementationClass="com.github.themirachathumina.golangintellijcommunity.GoFileType"
+                  fieldName="INSTANCE"
+                  language="Go"
+                  extensions="go"/>
+        <lang.parserDefinition language="Go"
+                               implementationClass="com.github.themirachathumina.golangintellijcommunity.GoParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="Go"
+                                     implementationClass="com.github.themirachathumina.golangintellijcommunity.highlight.GoSyntaxHighlighterFactory"/>
+        <colorSettingsPage implementation="com.github.themirachathumina.golangintellijcommunity.highlight.GoColorSettingsPage"/>
+        <annotator
+                language="Go"
+                implementationClass="com.github.themirachathumina.golangintellijcommunity.highlight.GoFormatVerbAnnotator"/>
+        <multiHostInjector implementation="com.github.themirachathumina.golangintellijcommunity.highlight.GoRegExpInjector"/>
+        <annotator language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.highlight.GoSemanticAnnotator"/>
+        <annotator language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.highlight.GoEscapeSequenceAnnotator"/>
+
+        <lang.foldingBuilder language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoFoldingBuilder"/>
+        <lang.commenter language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoCommenter"/>
+        <highlightErrorFilter implementation="com.github.themirachathumina.golangintellijcommunity.highlight.GoHighlightErrorFilter"/>
+        <lang.braceMatcher language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoPairedBraceMatcher"/>
+        <lang.quoteHandler language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoQuoteHandler"/>
+        <spellchecker.support language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoSpellcheckingStrategy"/>
+
+        <!-- LSP textDocument/signatureHelp -->
+        <codeInsight.parameterInfo
+                language="Go"
+                implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+
+        <!-- LSP textDocument/documentSymbol -->
+        <lang.psiStructureViewFactory
+                language="Go"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+    </extensions>
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="gopls"
+                name="Go Language Server"
+                factoryClass="com.github.themirachathumina.golangintellijcommunity.lsp.GoLanguageServerFactory"/>
+
+        <languageMapping language="Go" serverId="gopls"/>
     </extensions>
 </idea-plugin>
