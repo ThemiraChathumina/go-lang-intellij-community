@@ -6,6 +6,8 @@
     <incompatible-with>com.intellij.modules.ultimate</incompatible-with>
     <depends>com.intellij.modules.platform</depends>
     <depends>com.redhat.devtools.lsp4ij</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
@@ -34,6 +36,13 @@
         <lang.quoteHandler language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoQuoteHandler"/>
         <spellchecker.support language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoSpellcheckingStrategy"/>
 
+        <sdkType implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkType"/>
+        <editorNotificationProvider implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkEditorNotificationProvider"/>
+        <postStartupActivity implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkAutoDetector"/>
+        <statusBarWidgetFactory id="GoSdkStatusBarWidgetFactory" implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkStatusBarWidgetFactory"/>
+
+        <newProjectWizard.generator implementation="com.github.themirachathumina.golangintellijcommunity.wizard.GoNewProjectWizard"/>
+
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
                 language="Go"
@@ -44,6 +53,14 @@
                 language="Go"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
     </extensions>
+
+    <actions>
+        <action id="Go.NewGoFile"
+                class="com.github.themirachathumina.golangintellijcommunity.ide.actions.GoCreateFileAction">
+            <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>
+        </action>
+    </actions>
+
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
         <server id="gopls"
                 name="Go Language Server"
