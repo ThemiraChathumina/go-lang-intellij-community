@@ -133,6 +133,15 @@ tasks {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
 
+    runIde {
+        jvmArgumentProviders += CommandLineArgumentProvider {
+            listOf(
+                "-Didea.log.debug.categories=#com.github.themirachathumina.golangintellijcommunity",
+                "-Didea.is.internal=true",
+            )
+        }
+    }
+
     generateLexer {
         sourceFile.set(file("src/main/kotlin/com/github/themirachathumina/golangintellijcommunity/_GoLexer.flex"))
         targetOutputDir.set(layout.projectDirectory.dir("src/main/gen/com/github/themirachathumina/golangintellijcommunity"))

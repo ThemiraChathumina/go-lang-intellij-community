@@ -1,9 +1,12 @@
 package com.github.themirachathumina.golangintellijcommunity.ide
 
-import com.github.themirachathumina.golangintellijcommunity.psi.*
+import com.github.themirachathumina.golangintellijcommunity.psi.GoBlock
+import com.github.themirachathumina.golangintellijcommunity.psi.GoImportDecl
+import com.github.themirachathumina.golangintellijcommunity.psi.GoStructType
 import com.intellij.lang.ASTNode
 import com.intellij.lang.folding.FoldingBuilderEx
 import com.intellij.lang.folding.FoldingDescriptor
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.util.TextRange
@@ -11,70 +14,44 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
 class GoFoldingBuilder : FoldingBuilderEx(), DumbAware {
+    private val LOG = Logger.getInstance(GoFoldingBuilder::class.java)
+
     override fun buildFoldRegions(root: PsiElement, document: Document, quick: Boolean): Array<FoldingDescriptor> {
+        LOG.debug("[Go-Lang-Community] Building fold regions for ${root.containingFile?.name}")
         val descriptors = mutableListOf<FoldingDescriptor>()
 
-        PsiTreeUtil.processElements(root) { element ->
-            when (element) {
-                is GoBlock -> {
-                    addDescriptor(descriptors, element, "{", "}")
-                }
-                is GoStructType -> {
-                    addDescriptor(descriptors, element, "{", "}")
-                }
-                is GoInterfaceType -> {
-                    addDescriptor(descriptors, element, "{", "}")
-                }
-                is GoImportDecl -> {
-                    val lparen = element.node.findChildByType(GoTypes.LPAREN)
-                    val rparen = element.node.findChildByType(GoTypes.RPAREN)
-                    if (lparen != null && rparen != null) {
-                        descriptors.add(FoldingDescriptor(element.node, TextRange(lparen.startOffset, rparen.startOffset + 1)))
-                    }
-                }
-                is GoConstDecl -> {
-                    addGroupedDescriptor(descriptors, element)
-                }
-                is GoVarDecl -> {
-                    addGroupedDescriptor(descriptors, element)
-                }
-                is GoTypeDecl -> {
-                    addGroupedDescriptor(descriptors, element)
-                }
+        // 1. Blocks { ... }
+        PsiTreeUtil.findChildrenOfType(root, GoBlock::class.java).forEach { block ->
+            descriptors.add(FoldingDescriptor(block.node, block.textRange))
+        }
+
+        // 2. Imports import ( ... )
+        PsiTreeUtil.findChildrenOfType(root, GoImportDecl::class.java).forEach { importDecl ->
+            val lParen = importDecl.node.findChildByType(com.github.themirachathumina.golangintellijcommunity.psi.GoTypes.LPAREN)
+            val rParen = importDecl.node.findChildByType(com.github.themirachathumina.golangintellijcommunity.psi.GoTypes.RPAREN)
+            if (lParen != null && rParen != null) {
+                descriptors.add(FoldingDescriptor(importDecl.node, TextRange(lParen.startOffset, rParen.startOffset + 1)))
             }
-            true
+        }
+
+        // 3. Structs struct { ... }
+        PsiTreeUtil.findChildrenOfType(root, GoStructType::class.java).forEach { struct ->
+            descriptors.add(FoldingDescriptor(struct.node, struct.textRange))
         }
 
         return descriptors.toTypedArray()
     }
 
-    private fun addDescriptor(descriptors: MutableList<FoldingDescriptor>, element: PsiElement, startToken: String, endToken: String) {
-        val range = element.textRange
-        if (range.length > 2) { // Only fold if not empty {}
-            descriptors.add(FoldingDescriptor(element.node, range))
-        }
-    }
-
-    private fun addGroupedDescriptor(descriptors: MutableList<FoldingDescriptor>, element: PsiElement) {
-        val lparen = element.node.findChildByType(GoTypes.LPAREN)
-        val rparen = element.node.findChildByType(GoTypes.RPAREN)
-        if (lparen != null && rparen != null) {
-            descriptors.add(FoldingDescriptor(element.node, TextRange(lparen.startOffset, rparen.startOffset + 1)))
-        }
-    }
-
     override fun getPlaceholderText(node: ASTNode): String? {
-        val type = node.elementType
-        if (type == GoTypes.BLOCK || type == GoTypes.STRUCT_TYPE || type == GoTypes.INTERFACE_TYPE) {
-            return "{...}"
+        return when (node.psi) {
+            is GoBlock -> "{...}"
+            is GoImportDecl -> "(...)"
+            is GoStructType -> "{...}"
+            else -> "..."
         }
-        if (type == GoTypes.IMPORT_DECL || type == GoTypes.CONST_DECL || type == GoTypes.VAR_DECL || type == GoTypes.TYPE_DECL) {
-            return "(...)"
-        }
-        return "..."
     }
 
     override fun isCollapsedByDefault(node: ASTNode): Boolean {
-        return false
+        return node.psi is GoImportDecl
     }
 }

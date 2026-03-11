@@ -42,7 +42,7 @@
         <statusBarWidgetFactory id="GoSdkStatusBarWidgetFactory" implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkStatusBarWidgetFactory"/>
 
         <newProjectWizard.generator implementation="com.github.themirachathumina.golangintellijcommunity.wizard.GoNewProjectWizard"/>
-
+        <configurationType implementation="com.github.themirachathumina.golangintellijcommunity.run.GoRunConfigurationType"/>
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
                 language="Go"
@@ -52,6 +52,14 @@
         <lang.psiStructureViewFactory
                 language="Go"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoFileRunConfigurationProducer"/>
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoPackageRunConfigurationProducer"/>
+        <runLineMarkerContributor
+                language="Go"
+                implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
+
+        <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
     </extensions>
 
     <actions>
@@ -68,4 +76,11 @@
 
         <languageMapping language="Go" serverId="gopls"/>
     </extensions>
+
+    <applicationListeners>
+        <listener class="com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkDetector"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
+
+
 </idea-plugin>

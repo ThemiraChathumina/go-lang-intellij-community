@@ -3,78 +3,66 @@ package com.github.themirachathumina.golangintellijcommunity.ide.actions
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.intellij.ide.actions.CreateFileFromTemplateAction
 import com.intellij.ide.actions.CreateFileFromTemplateDialog
-import com.intellij.openapi.application.WriteAction
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
-import java.util.Locale
+import com.intellij.openapi.application.runWriteAction
+import com.intellij.psi.PsiDocumentManager
 
-class GoCreateFileAction : CreateFileFromTemplateAction(
-    "Go File",
-    "Create a new Go file",
-    GoIcons.FILE
-) {
+class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new Go file", GoIcons.FILE), DumbAware {
+    private val LOG = Logger.getInstance(GoCreateFileAction::class.java)
 
     override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
-        builder.setTitle("New Go File")
-            .addKind("Simple File", GoIcons.FILE, "Go File")
-            .addKind("Main File", GoIcons.FILE, "Go Main File")
-            .addKind("Test File", GoIcons.FILE, "Go Test File")
+        builder
+            .setTitle("New Go File")
+            .addKind("Simple file", GoIcons.FILE, "Go File")
+            .addKind("Main file", GoIcons.FILE, "Go Main File")
+            .addKind("Test file", GoIcons.FILE, "Go Test File")
     }
 
-    override fun getActionName(directory: PsiDirectory, newName: String, templateName: String): String {
-        return "Create Go File: $newName"
+    override fun getActionName(directory: PsiDirectory?, newName: String, templateName: String?): String = "Go File"
+
+    override fun postProcess(createdFile: PsiFile, templateName: String?, customProperties: Map<String, String>?) {
+        super.postProcess(createdFile, templateName, customProperties)
+        
+        LOG.info("[Go-Lang-Community] Post-processing created file: ${createdFile.name} (template: $templateName)")
+
+        // Don't sanitize if it's explicitly a Main file template which uses 'package main'
+        if (templateName == "Go Main File") {
+            LOG.info("[Go-Lang-Community] Skipping sanitization for Main file")
+            return
+        }
+
+        val project = createdFile.project
+        val directory = createdFile.containingDirectory ?: return
+        val sanitizedPackage = sanitizePackageName(directory.name)
+        
+        runWriteAction {
+            val documentManager = PsiDocumentManager.getInstance(project)
+            val document = documentManager.getDocument(createdFile) ?: return@runWriteAction
+            val text = document.text
+            
+            val oldPackagePrefix = "package "
+            if (text.startsWith(oldPackagePrefix)) {
+                val endOfLine = text.indexOf('\n')
+                val firstLine = if (endOfLine != -1) text.substring(0, endOfLine).trim() else text.trim()
+                val newFirstLine = "package $sanitizedPackage"
+                
+                if (firstLine != newFirstLine) {
+                    LOG.info("[Go-Lang-Community] Updating package declaration from '$firstLine' to '$newFirstLine'")
+                    document.replaceString(0, firstLine.length, newFirstLine)
+                    documentManager.commitDocument(document)
+                }
+            }
+        }
     }
 
-    override fun createFile(name: String, templateName: String, dir: PsiDirectory): PsiFile? {
-        val project = dir.project
-
-        val baseName = name.removeSuffix(".go")
-        var fileName = "$baseName.go"
-
-        // Calculate dynamic package name
-        var pkgName = dir.name.replace(Regex("[^a-zA-Z0-9_]"), "")
-        if (pkgName.isEmpty() || pkgName.first().isDigit()) {
-            pkgName = "pkg$pkgName"
-        }
-
-        val content: String
-
-        when (templateName) {
-            "Go Main File" -> {
-                content = "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello, World!\")\n}\n"
-            }
-            "Go Test File" -> {
-                if (!fileName.endsWith("_test.go")) {
-                    fileName = "${baseName}_test.go"
-                }
-                val testFuncName = baseName.replaceFirstChar {
-                    if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                }
-                content = "package $pkgName\n\nimport \"testing\"\n\nfunc Test$testFuncName(t *testing.T) {\n\t// TODO: Initialize test\n}\n"
-            }
-            else -> {
-                content = "package $pkgName\n"
-            }
-        }
-
-        return WriteAction.compute<PsiFile?, RuntimeException> {
-            val virtualDir = dir.virtualFile
-
-            // 1. Create the file with a dummy extension so gopls ignores it initially
-            val tempFileName = "$fileName.tmp"
-            val virtualFile = virtualDir.createChildData(this, tempFileName)
-
-            // 2. Atomically inject the text
-            virtualFile.setBinaryContent(content.toByteArray(Charsets.UTF_8))
-
-            // 3. Rename it to the actual .go file name.
-            // lsp4ij is now notified, but the file already has content, so gopls does nothing.
-            virtualFile.rename(this, fileName)
-
-            // 4. Convert back to PSI so the IDE opens it in the editor
-            PsiManager.getInstance(project).findFile(virtualFile)
-        }
+    private fun sanitizePackageName(name: String): String {
+        val sanitized = name.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
+        val result = if (sanitized.isEmpty() || sanitized[0].isDigit()) "main" else sanitized
+        LOG.debug("[Go-Lang-Community] Sanitized package name for directory '$name': $result")
+        return result
     }
 }
