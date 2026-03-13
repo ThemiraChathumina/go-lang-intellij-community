@@ -84,6 +84,7 @@
         <lang.foldingBuilder language="GoMod"
                              implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFoldingBuilder"/>
         <editorNotificationProvider implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoSumEditorNotificationProvider"/>
+        <fileIconProvider implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFileIconProvider"/>
     </extensions>
 
     <actions>
