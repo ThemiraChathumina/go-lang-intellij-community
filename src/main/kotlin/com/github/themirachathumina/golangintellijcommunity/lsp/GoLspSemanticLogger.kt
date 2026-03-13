@@ -1,0 +1,146 @@
+package com.github.themirachathumina.golangintellijcommunity.lsp
+
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
+import com.google.gson.Gson
+import org.eclipse.lsp4j.jsonrpc.messages.Message
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Intercepts all LSP messages via handleMessage (which receives both client→server
+ * and server→client messages) and prints semantic token data as
+ * "identifier → tokenType [modifiers]" lines.
+ */
+class GoLspSemanticLogger {
+
+    private val gson = Gson()
+
+    @Volatile private var tokenTypes: List<String> = emptyList()
+    @Volatile private var tokenModifiers: List<String> = emptyList()
+
+    // uri → file lines
+    private val fileContents = ConcurrentHashMap<String, List<String>>()
+
+    // request id → uri
+    private val pendingRequests = ConcurrentHashMap<String, String>()
+
+    fun onMessage(message: Message) {
+        val obj = try {
+            JsonParser.parseString(gson.toJson(message)).asJsonObject
+        } catch (_: Exception) { return }
+
+        val method = obj.get("method")?.asString
+
+        if (method != null) {
+            handleOutgoing(method, obj)
+        } else {
+            handleIncoming(obj)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Client→server: track file contents and pending semantic token requests
+    // -------------------------------------------------------------------------
+
+    private fun handleOutgoing(method: String, obj: JsonObject) {
+        when (method) {
+            "textDocument/didOpen" -> {
+                val td   = obj.getAsJsonObject("params")?.getAsJsonObject("textDocument") ?: return
+                val uri  = td.get("uri")?.asString  ?: return
+                val text = td.get("text")?.asString ?: return
+                fileContents[uri] = text.split("\n")
+            }
+
+            "textDocument/didChange" -> {
+                val params  = obj.getAsJsonObject("params") ?: return
+                val uri     = params.getAsJsonObject("textDocument")?.get("uri")?.asString ?: return
+                val changes = params.getAsJsonArray("contentChanges") ?: return
+                for (change in changes) {
+                    val c = change.asJsonObject
+                    if (!c.has("range")) {
+                        fileContents[uri] = c.get("text")?.asString?.split("\n") ?: continue
+                    }
+                }
+            }
+
+            "textDocument/semanticTokens/full" -> {
+                val uri = obj.getAsJsonObject("params")
+                    ?.getAsJsonObject("textDocument")
+                    ?.get("uri")?.asString ?: return
+                val id = extractId(obj) ?: return
+                pendingRequests[id] = uri
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Server→client responses (no "method" field)
+    // -------------------------------------------------------------------------
+
+    private fun handleIncoming(obj: JsonObject) {
+        val resultElement = obj.get("result") ?: return
+        if (!resultElement.isJsonObject) return
+        val result = resultElement.asJsonObject
+        val id     = extractId(obj)
+
+        // initialize response → capture token legend
+        if (result.has("capabilities")) {
+            val legend = result.getAsJsonObject("capabilities")
+                ?.getAsJsonObject("semanticTokensProvider")
+                ?.getAsJsonObject("legend") ?: return
+            tokenTypes     = legend.getAsJsonArray("tokenTypes")?.map  { it.asString } ?: emptyList()
+            tokenModifiers = legend.getAsJsonArray("tokenModifiers")?.map { it.asString } ?: emptyList()
+            println("[SemanticTokens] Legend loaded: ${tokenTypes.size} types, ${tokenModifiers.size} modifiers")
+            return
+        }
+
+        // semantic tokens response
+        if (id == null) return
+        val uri       = pendingRequests.remove(id) ?: return
+        val dataArray = result.getAsJsonArray("data") ?: return
+        if (dataArray.size() == 0) return
+
+        val data     = dataArray.map { it.asInt }
+        val lines    = fileContents[uri]
+        val fileName = uri.substringAfterLast("/")
+
+        println("\n[SemanticTokens] $fileName")
+        decode(data, lines)
+    }
+
+    // -------------------------------------------------------------------------
+    // Decode delta-encoded token array
+    // -------------------------------------------------------------------------
+
+    private fun decode(data: List<Int>, lines: List<String>?) {
+        var line = 0
+        var char = 0
+        var i    = 0
+        while (i + 5 <= data.size) {
+            val deltaLine  = data[i]
+            val deltaStart = data[i + 1]
+            val length     = data[i + 2]
+            val typeIdx    = data[i + 3]
+            val modBits    = data[i + 4]
+            i += 5
+
+            if (deltaLine > 0) { line += deltaLine; char = deltaStart }
+            else               { char += deltaStart }
+
+            val typeName = tokenTypes.getOrElse(typeIdx) { "unknown($typeIdx)" }
+            val mods     = tokenModifiers.filterIndexed { bit, _ -> modBits and (1 shl bit) != 0 }
+
+            val text = lines?.getOrNull(line)?.let { row ->
+                if (char + length <= row.length) row.substring(char, char + length) else "?"
+            } ?: "${line}:${char}"
+
+            val modStr = if (mods.isEmpty()) "" else " [${mods.joinToString(", ")}]"
+            println("  $text → $typeName$modStr")
+        }
+    }
+
+    private fun extractId(obj: JsonObject): String? {
+        val id = obj.getAsJsonObject("id") ?: return null
+        return id.get("left")?.asString ?: id.get("right")?.asString
+    }
+}

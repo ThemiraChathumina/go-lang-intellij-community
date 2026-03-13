@@ -12,6 +12,14 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+                serviceImplementation="com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings"/>
+        <applicationConfigurable
+                parentId="language"
+                instance="com.github.themirachathumina.golangintellijcommunity.settings.GoLanguageConfigurable"
+                id="com.github.themirachathumina.golangintellijcommunity.settings.GoLanguageConfigurable"
+                displayName="Go"/>
+
         <fileType name="Go File"
                   implementationClass="com.github.themirachathumina.golangintellijcommunity.GoFileType"
                   fieldName="INSTANCE"
@@ -59,6 +67,23 @@
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
 
         <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
+
+        <!-- go.mod / go.work file type -->
+        <fileType name="Go Module File"
+                  implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFileType"
+                  fieldName="INSTANCE"
+                  language="GoMod"
+                  fileNames="go.mod;go.work;go.sum"/>
+        <fileTypeDetector implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFileTypeDetector"/>
+        <lang.parserDefinition language="GoMod"
+                               implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModParserDefinition"/>
+        <lang.syntaxHighlighterFactory language="GoMod"
+                                       implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModSyntaxHighlighterFactory"/>
+        <lang.commenter language="GoMod"
+                        implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModCommenter"/>
+        <lang.foldingBuilder language="GoMod"
+                             implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFoldingBuilder"/>
+        <editorNotificationProvider implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoSumEditorNotificationProvider"/>
     </extensions>
 
     <actions>
@@ -73,7 +98,12 @@
                 name="Go Language Server"
                 factoryClass="com.github.themirachathumina.golangintellijcommunity.lsp.GoLanguageServerFactory"/>
 
-        <languageMapping language="Go" serverId="gopls"/>
+        <languageMapping language="Go"    serverId="gopls"/>
+        <languageMapping language="GoMod" serverId="gopls"/>
+        <fileTypeMapping fileType="Go Module File" serverId="gopls"/>
+        <semanticTokensColorsProvider
+                serverId="gopls"
+                class="com.github.themirachathumina.golangintellijcommunity.highlight.GoSemanticTokensColorsProvider"/>
     </extensions>
 
     <applicationListeners>

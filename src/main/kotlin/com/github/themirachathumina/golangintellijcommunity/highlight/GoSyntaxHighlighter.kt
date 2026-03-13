@@ -36,6 +36,7 @@ class GoSyntaxHighlighter : SyntaxHighlighterBase() {
         val STRUCT_TAG = createTextAttributesKey("GO_STRUCT_TAG", DefaultLanguageHighlighterColors.METADATA)
 
         val VALID_STRING_ESCAPE = createTextAttributesKey("GO_VALID_STRING_ESCAPE", DefaultLanguageHighlighterColors.VALID_STRING_ESCAPE)
+        val CONSTANT = createTextAttributesKey("GO_CONSTANT", DefaultLanguageHighlighterColors.STATIC_FIELD)
 
         private val KEYWORD_KEYS = arrayOf(KEYWORD)
         private val NUMBER_KEYS = arrayOf(NUMBER)

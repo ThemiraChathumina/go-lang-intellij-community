@@ -33,7 +33,8 @@ class GoColorSettingsPage : ColorSettingsPage {
             AttributesDescriptor("Functions//Function Call", GoSyntaxHighlighter.FUNCTION_CALL),
             AttributesDescriptor("Functions//Method Call", GoSyntaxHighlighter.METHOD_CALL),
             AttributesDescriptor("Structs//Field", GoSyntaxHighlighter.STRUCT_FIELD),
-            AttributesDescriptor("Structs//Tag", GoSyntaxHighlighter.STRUCT_TAG)
+            AttributesDescriptor("Structs//Tag", GoSyntaxHighlighter.STRUCT_TAG),
+            AttributesDescriptor("Constant", GoSyntaxHighlighter.CONSTANT)
         )
     }
 

@@ -31,8 +31,10 @@ object GoModReconciler {
             val goWorkFile = File(rootDir, "go.work")
             if (goWorkFile.exists()) {
                 reconcileWorkspace(project, newSdkPath, newVersion, goWorkFile)
+                // Also check individual go.mod files within the workspace for out-of-band use
+                reconcileModules(project, newSdkPath, newVersion, rootDir, withinWorkspace = true)
             } else {
-                reconcileModules(project, newSdkPath, newVersion, rootDir)
+                reconcileModules(project, newSdkPath, newVersion, rootDir, withinWorkspace = false)
             }
         }
     }
@@ -97,7 +99,7 @@ object GoModReconciler {
         }
     }
 
-    private fun reconcileModules(project: Project, newSdkPath: String, newVersion: String, rootDir: File) {
+    private fun reconcileModules(project: Project, newSdkPath: String, newVersion: String, rootDir: File, withinWorkspace: Boolean = false) {
         val allGoMods = rootDir.walkTopDown()
             .maxDepth(6)
             .onEnter { it.name != "vendor" && it.name != ".git" }
@@ -110,13 +112,19 @@ object GoModReconciler {
             val moduleDir = goModFile.parentFile
             val moduleLabel = moduleDir.relativeTo(rootDir).path.ifEmpty { "root" }
 
+            // In workspace mode, only notify if the version diverges — go.work takes precedence
+            // for workspace builds, but the go.mod version still matters for out-of-workspace use.
+            val workspaceNote = if (withinWorkspace)
+                " Note: go.work takes precedence inside the workspace, but this module's go.mod may matter when used outside it."
+            else ""
+
             ApplicationManager.getApplication().invokeLater {
                 if (comparison < 0) {
                     val notification = NotificationGroupManager.getInstance()
                         .getNotificationGroup("Go Plugin Notifications")
                         .createNotification(
                             "Go SDK Downgraded",
-                            "Selected SDK (Go $newVersion) is older than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.",
+                            "Selected SDK (Go $newVersion) is older than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.$workspaceNote",
                             NotificationType.WARNING
                         )
                     notification.addAction(NotificationAction.createSimple("Downgrade go.mod to $newVersion") {
@@ -129,7 +137,7 @@ object GoModReconciler {
                         .getNotificationGroup("Go Plugin Notifications")
                         .createNotification(
                             "Go SDK Upgraded",
-                            "Selected SDK (Go $newVersion) is newer than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.",
+                            "Selected SDK (Go $newVersion) is newer than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.$workspaceNote",
                             NotificationType.INFORMATION
                         )
                     notification.addAction(NotificationAction.createSimple("Upgrade go.mod to $newVersion") {

@@ -7,7 +7,10 @@ import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
 import com.redhat.devtools.lsp4ij.LanguageServerEnablementSupport
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
+import com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings
+import com.intellij.psi.PsiFile
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
+import com.redhat.devtools.lsp4ij.client.features.LSPSelectionRangeFeature
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 import org.eclipse.lsp4j.InitializeParams
 import org.jetbrains.annotations.NotNull
@@ -22,15 +25,29 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
 
     override fun createLanguageClient(@NotNull project: Project): LanguageClientImpl {
         LOG.debug("[Go-Lang-Community] Creating language client for ${project.name}")
-        return LanguageClientImpl(project)
+        return GoLanguageClient(project)
     }
 
     override fun createClientFeatures(): @NotNull LSPClientFeatures {
         return object : LSPClientFeatures() {
             override fun initializeParams(@NotNull params: InitializeParams) {
                 super.initializeParams(params)
-                LOG.debug("[Go-Lang-Community] Initializing client features, disabling semantic tokens")
-                params.capabilities?.textDocument?.semanticTokens = null
+                if (!GoAppSettings.getInstance().state.semanticTokensEnabled) {
+                    LOG.debug("[Go-Lang-Community] Semantic tokens disabled by settings — nulling capability")
+                    params.capabilities?.textDocument?.semanticTokens = null
+                } else {
+                    LOG.debug("[Go-Lang-Community] Semantic tokens enabled by settings")
+                }
+            }
+
+            init {
+                setSelectionRangeFeature(object : LSPSelectionRangeFeature() {
+                    override fun isSelectionRangeSupported(file: PsiFile): Boolean {
+                        val name = file.virtualFile?.name ?: return super.isSelectionRangeSupported(file)
+                        if (name == "go.mod" || name == "go.work") return false
+                        return super.isSelectionRangeSupported(file)
+                    }
+                })
             }
         }
     }
