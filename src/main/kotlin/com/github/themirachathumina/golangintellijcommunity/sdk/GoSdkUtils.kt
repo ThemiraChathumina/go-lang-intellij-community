@@ -201,6 +201,13 @@ object GoSdkUtils {
         return 0
     }
 
+    fun readGoDirective(file: File): String? {
+        val content = file.readText()
+        val toolchainMatch = Regex("""^toolchain\s+go([\d.]+)""", RegexOption.MULTILINE).find(content)
+        val goMatch = Regex("""^go\s+([\d.]+)""", RegexOption.MULTILINE).find(content)
+        return toolchainMatch?.groupValues?.get(1) ?: goMatch?.groupValues?.get(1)
+    }
+
     fun isSupportedVersion(version: String): Boolean {
         return compareVersions(version, MIN_SUPPORTED_VERSION) >= 0
     }

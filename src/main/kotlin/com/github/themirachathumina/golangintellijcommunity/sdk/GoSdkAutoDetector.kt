@@ -21,7 +21,7 @@ class GoSdkAutoDetector : ProjectActivity {
     override suspend fun execute(project: Project) {
         val basePath = project.basePath ?: return
         val rootDir = File(basePath)
-        val isGoProject = rootDir.walkTopDown().maxDepth(2).any { it.name == "go.mod" || it.name.endsWith(".go") }
+        val isGoProject = rootDir.walkTopDown().maxDepth(2).any { it.name == "go.work" || it.name == "go.mod" || it.name.endsWith(".go") }
         if (!isGoProject) return
 
         val settings = GoProjectSettings.getInstance(project)
@@ -36,14 +36,21 @@ class GoSdkAutoDetector : ProjectActivity {
     }
 
     private fun resolveSdkForProject(project: Project, rootDir: File) {
-        val goModFile = File(rootDir, "go.mod")
-        var requiredVersion: String? = null
-
-        if (goModFile.exists()) {
-            val content = goModFile.readText()
-            val toolchainMatch = Regex("""^toolchain\s+go([\d.]+)""", RegexOption.MULTILINE).find(content)
-            val goMatch = Regex("""^go\s+([\d.]+)""", RegexOption.MULTILINE).find(content)
-            requiredVersion = toolchainMatch?.groupValues?.get(1) ?: goMatch?.groupValues?.get(1)
+        // go.work is authoritative for the whole workspace — read it first if present
+        val goWorkFile = File(rootDir, "go.work")
+        val requiredVersion: String? = if (goWorkFile.exists()) {
+            LOG.info("[Go-Lang-Community] Found go.work at ${goWorkFile.absolutePath}, using its go directive")
+            GoSdkUtils.readGoDirective(goWorkFile)
+        } else {
+            // No go.work — collect all go.mod files and pick the highest required version
+            val allGoMods = rootDir.walkTopDown()
+                .maxDepth(6)
+                .onEnter { it.name != "vendor" && it.name != ".git" }
+                .filter { it.name == "go.mod" }
+                .toList()
+            allGoMods
+                .mapNotNull { GoSdkUtils.readGoDirective(it) }
+                .maxWithOrNull(Comparator { a, b -> compareVersions(a, b) })
         }
 
         val registry = GoGlobalSdkRegistry.getInstance()

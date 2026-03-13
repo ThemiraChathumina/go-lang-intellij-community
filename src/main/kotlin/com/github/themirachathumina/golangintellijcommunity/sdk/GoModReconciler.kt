@@ -19,30 +19,79 @@ object GoModReconciler {
     fun reconcile(project: Project, newSdkPath: String) {
         ApplicationManager.getApplication().executeOnPooledThread {
             val basePath = project.basePath ?: return@executeOnPooledThread
-            val goModFile = File(basePath, "go.mod")
-            if (!goModFile.exists()) return@executeOnPooledThread
-
-            val content = goModFile.readText()
-            val toolchainMatch = Regex("""^toolchain\s+go([\d.]+)""", RegexOption.MULTILINE).find(content)
-            val goMatch = Regex("""^go\s+([\d.]+)""", RegexOption.MULTILINE).find(content)
-            val requiredVersion = toolchainMatch?.groupValues?.get(1) ?: goMatch?.groupValues?.get(1) ?: return@executeOnPooledThread
-
             val newVersion = GoSdkUtils.retrieveGoVersion(newSdkPath) ?: return@executeOnPooledThread
+            val rootDir = File(basePath)
+            val goWorkFile = File(rootDir, "go.work")
 
+            if (goWorkFile.exists()) {
+                reconcileWorkspace(project, newSdkPath, newVersion, goWorkFile)
+            } else {
+                reconcileModules(project, newSdkPath, newVersion, rootDir)
+            }
+        }
+    }
+
+    private fun reconcileWorkspace(project: Project, newSdkPath: String, newVersion: String, goWorkFile: File) {
+        val requiredVersion = GoSdkUtils.readGoDirective(goWorkFile) ?: return
+        val comparison = compareVersions(newVersion, requiredVersion)
+        val workspaceDir = goWorkFile.parentFile
+
+        ApplicationManager.getApplication().invokeLater {
+            if (comparison < 0) {
+                val notification = NotificationGroupManager.getInstance()
+                    .getNotificationGroup("Go Plugin Notifications")
+                    .createNotification(
+                        "Go SDK Downgraded",
+                        "Selected SDK (Go $newVersion) is older than go.work requirement (Go $requiredVersion).",
+                        NotificationType.WARNING
+                    )
+                notification.addAction(NotificationAction.createSimple("Downgrade go.work to $newVersion") {
+                    notification.expire()
+                    runModCommand(project, newSdkPath, listOf("work", "edit", "-go=$newVersion", "-toolchain=go$newVersion"), workspaceDir)
+                })
+                notification.notify(project)
+            } else if (comparison > 0) {
+                val notification = NotificationGroupManager.getInstance()
+                    .getNotificationGroup("Go Plugin Notifications")
+                    .createNotification(
+                        "Go SDK Upgraded",
+                        "Selected SDK (Go $newVersion) is newer than go.work requirement (Go $requiredVersion).",
+                        NotificationType.INFORMATION
+                    )
+                notification.addAction(NotificationAction.createSimple("Upgrade go.work to $newVersion") {
+                    notification.expire()
+                    runModCommand(project, newSdkPath, listOf("work", "edit", "-go=$newVersion", "-toolchain=go$newVersion"), workspaceDir)
+                })
+                notification.notify(project)
+            }
+        }
+    }
+
+    private fun reconcileModules(project: Project, newSdkPath: String, newVersion: String, rootDir: File) {
+        val allGoMods = rootDir.walkTopDown()
+            .maxDepth(6)
+            .onEnter { it.name != "vendor" && it.name != ".git" }
+            .filter { it.name == "go.mod" }
+            .toList()
+
+        for (goModFile in allGoMods) {
+            val requiredVersion = GoSdkUtils.readGoDirective(goModFile) ?: continue
             val comparison = compareVersions(newVersion, requiredVersion)
-            
+            val moduleDir = goModFile.parentFile
+            val moduleLabel = moduleDir.relativeTo(rootDir).path.ifEmpty { "root" }
+
             ApplicationManager.getApplication().invokeLater {
                 if (comparison < 0) {
                     val notification = NotificationGroupManager.getInstance()
                         .getNotificationGroup("Go Plugin Notifications")
                         .createNotification(
                             "Go SDK Downgraded",
-                            "Selected SDK (Go $newVersion) is older than go.mod requirement (Go $requiredVersion).",
+                            "Selected SDK (Go $newVersion) is older than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.",
                             NotificationType.WARNING
                         )
                     notification.addAction(NotificationAction.createSimple("Downgrade go.mod to $newVersion") {
                         notification.expire()
-                        runModCommand(project, newSdkPath, listOf("mod", "edit", "-go=$newVersion", "-toolchain=go$newVersion"))
+                        runModCommand(project, newSdkPath, listOf("mod", "edit", "-go=$newVersion", "-toolchain=go$newVersion"), moduleDir)
                     })
                     notification.notify(project)
                 } else if (comparison > 0) {
@@ -50,12 +99,12 @@ object GoModReconciler {
                         .getNotificationGroup("Go Plugin Notifications")
                         .createNotification(
                             "Go SDK Upgraded",
-                            "Selected SDK (Go $newVersion) is newer than go.mod requirement (Go $requiredVersion).",
+                            "Selected SDK (Go $newVersion) is newer than go.mod requirement (Go $requiredVersion) in module '$moduleLabel'.",
                             NotificationType.INFORMATION
                         )
                     notification.addAction(NotificationAction.createSimple("Upgrade go.mod to $newVersion") {
                         notification.expire()
-                        runModCommand(project, newSdkPath, listOf("get", "go@$newVersion", "toolchain@$newVersion"))
+                        runModCommand(project, newSdkPath, listOf("get", "go@$newVersion", "toolchain@$newVersion"), moduleDir)
                     })
                     notification.notify(project)
                 }
@@ -74,13 +123,13 @@ object GoModReconciler {
         return 0
     }
 
-    private fun runModCommand(project: Project, sdkPath: String, args: List<String>) {
+    private fun runModCommand(project: Project, sdkPath: String, args: List<String>, workDir: File) {
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Updating go.mod...", true) {
             override fun run(indicator: ProgressIndicator) {
                 val goExe = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return
                 try {
                     val cmd = GeneralCommandLine(listOf(goExe) + args)
-                        .withWorkDirectory(project.basePath)
+                        .withWorkDirectory(workDir)
                         .withEnvironment("GOROOT", sdkPath)
                     val handler = CapturingProcessHandler(cmd)
                     val output = handler.runProcess(30000)
