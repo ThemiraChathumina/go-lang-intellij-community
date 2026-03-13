@@ -37,19 +37,20 @@ object GoSdkUtils {
             }
         }
 
-        val gopath = System.getenv("GOPATH")
-        if (gopath != null) {
-            val gopathBin = File(File(gopath, "bin"), GOPLS_EXECUTABLE_NAME)
+        // Collect all GOPATH entries: system env, Go env file, and default ~/go — split on path separator
+        val gopathEntries = buildList {
+            val goEnv = readGoEnvFile()
+            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(it) }
+            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(it) }
+            add(File(System.getProperty("user.home"), "go").absolutePath)
+        }.distinct()
+
+        for (gopathEntry in gopathEntries) {
+            val gopathBin = File(File(gopathEntry, "bin"), GOPLS_EXECUTABLE_NAME)
             if (gopathBin.exists() && gopathBin.canExecute()) {
                 LOG.debug("Found gopls in GOPATH bin: ${gopathBin.absolutePath}")
                 return gopathBin.absolutePath
             }
-        }
-
-        val userHomeGoBin = File(File(System.getProperty("user.home"), "go/bin"), GOPLS_EXECUTABLE_NAME)
-        if (userHomeGoBin.exists() && userHomeGoBin.canExecute()) {
-            LOG.debug("Found gopls in user home go/bin: ${userHomeGoBin.absolutePath}")
-            return userHomeGoBin.absolutePath
         }
 
         LOG.debug("gopls not found in standard locations, falling back to: $GOPLS_EXECUTABLE_NAME")
@@ -154,12 +155,58 @@ object GoSdkUtils {
         return null
     }
 
+    /**
+     * Reads the per-user Go environment file (written by `go env -w`).
+     * Location: $GOENV, or ~/.config/go/env (Linux/Mac), or %AppData%\go\env (Windows).
+     * Returns an empty map if the file is absent, unreadable, or GOENV=off.
+     */
+    fun readGoEnvFile(): Map<String, String> {
+        val goenvVar = System.getenv("GOENV")
+        if (goenvVar == "off") return emptyMap()
+
+        val envFile = when {
+            goenvVar != null -> File(goenvVar)
+            SystemInfo.isWindows -> File(System.getenv("AppData") ?: return emptyMap(), "go/env")
+            else -> {
+                val xdgConfig = System.getenv("XDG_CONFIG_HOME")
+                if (xdgConfig != null) File(xdgConfig, "go/env")
+                else File(System.getProperty("user.home"), ".config/go/env")
+            }
+        }
+
+        if (!envFile.exists()) return emptyMap()
+        return try {
+            envFile.readLines()
+                .filter { it.isNotBlank() && !it.startsWith('#') && '=' in it }
+                .associate { line ->
+                    val idx = line.indexOf('=')
+                    line.substring(0, idx).trim() to line.substring(idx + 1).trim()
+                }
+        } catch (e: Exception) {
+            LOG.debug("Failed to read Go env file at ${envFile.absolutePath}: ${e.message}")
+            emptyMap()
+        }
+    }
+
     fun suggestSdkHomePaths(): List<String> {
         LOG.debug("Suggesting SDK home paths...")
         val suggestions = mutableListOf<String>()
         val home = System.getProperty("user.home")
+        val goEnv = readGoEnvFile()
 
-        // --- Environment variables ---
+        // --- Go env file overrides (highest priority — mirrors how Go tools resolve env) ---
+
+        goEnv["GOROOT"]?.let {
+            LOG.debug("Checking GOROOT from Go env file: $it")
+            if (isValidSdkHome(it)) suggestions.add(it)
+        }
+
+        // All GOPATH entries from the env file may contain sdk/ subdirs with downloaded toolchains
+        goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { gopathEntry ->
+            scanVersionedDir(File(gopathEntry, "sdk"), prefix = "go", suggestions)
+        }
+
+        // --- System environment variables ---
 
         System.getenv("GOROOT")?.let {
             LOG.debug("Checking GOROOT: $it")

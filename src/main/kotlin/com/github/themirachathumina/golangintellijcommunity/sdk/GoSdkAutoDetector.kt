@@ -53,8 +53,26 @@ class GoSdkAutoDetector : ProjectActivity {
                 .maxWithOrNull(Comparator { a, b -> compareVersions(a, b) })
         }
 
+        // GOTOOLCHAIN from the Go env file pins or constrains the toolchain version.
+        // Format: "local" | "auto" | "go1.22.0" | "go1.22.0+auto"
+        // If pinned to a specific version, treat it as the preferred SDK version.
+        val gotoolchain = GoSdkUtils.readGoEnvFile()["GOTOOLCHAIN"]
+            ?: System.getenv("GOTOOLCHAIN")
+        val toolchainVersion = gotoolchain
+            ?.let { Regex("""^go(\d+\.\d+(?:\.\d+)?)""").find(it)?.groupValues?.get(1) }
+
         val registry = GoGlobalSdkRegistry.getInstance()
         val allSdks = registry.getSdkPaths()
+
+        // If GOTOOLCHAIN pins a specific version and we have it, use it directly
+        if (toolchainVersion != null) {
+            val toolchainMatch = allSdks.find { GoSdkUtils.retrieveGoVersion(it) == toolchainVersion }
+            if (toolchainMatch != null) {
+                LOG.info("[Go-Lang-Community] Using SDK pinned by GOTOOLCHAIN=$gotoolchain: $toolchainMatch")
+                assignAndStart(project, toolchainMatch)
+                return
+            }
+        }
 
         if (requiredVersion != null) {
             val exactMatch = allSdks.find { GoSdkUtils.retrieveGoVersion(it) == requiredVersion }
