@@ -36,21 +36,28 @@ class GoSdkAutoDetector : ProjectActivity {
     }
 
     private fun resolveSdkForProject(project: Project, rootDir: File) {
-        // go.work is authoritative for the whole workspace — read it first if present
-        val goWorkFile = File(rootDir, "go.work")
-        val requiredVersion: String? = if (goWorkFile.exists()) {
-            LOG.info("[Go-Lang-Community] Found go.work at ${goWorkFile.absolutePath}, using its go directive")
-            GoSdkUtils.readGoDirective(goWorkFile)
+        // .go-version has highest precedence — used by goenv/asdf/mise to pin project toolchain
+        val goVersionFile = File(rootDir, ".go-version")
+        val requiredVersion: String? = if (goVersionFile.exists()) {
+            LOG.info("[Go-Lang-Community] Found .go-version at ${goVersionFile.absolutePath}, using its version")
+            GoSdkUtils.readGoVersionFile(goVersionFile)
         } else {
-            // No go.work — collect all go.mod files and pick the highest required version
-            val allGoMods = rootDir.walkTopDown()
-                .maxDepth(6)
-                .onEnter { it.name != "vendor" && it.name != ".git" }
-                .filter { it.name == "go.mod" }
-                .toList()
-            allGoMods
-                .mapNotNull { GoSdkUtils.readGoDirective(it) }
-                .maxWithOrNull(Comparator { a, b -> compareVersions(a, b) })
+            // go.work is authoritative for the whole workspace if present
+            val goWorkFile = File(rootDir, "go.work")
+            if (goWorkFile.exists()) {
+                LOG.info("[Go-Lang-Community] Found go.work at ${goWorkFile.absolutePath}, using its go directive")
+                GoSdkUtils.readGoDirective(goWorkFile)
+            } else {
+                // No go.work — collect all go.mod files and pick the highest required version
+                val allGoMods = rootDir.walkTopDown()
+                    .maxDepth(6)
+                    .onEnter { it.name != "vendor" && it.name != ".git" }
+                    .filter { it.name == "go.mod" }
+                    .toList()
+                allGoMods
+                    .mapNotNull { GoSdkUtils.readGoDirective(it) }
+                    .maxWithOrNull(Comparator { a, b -> compareVersions(a, b) })
+            }
         }
 
         // GOTOOLCHAIN from the Go env file pins or constrains the toolchain version.

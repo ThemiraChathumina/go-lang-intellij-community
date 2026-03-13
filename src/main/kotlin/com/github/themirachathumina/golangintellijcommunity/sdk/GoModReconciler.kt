@@ -21,13 +21,43 @@ object GoModReconciler {
             val basePath = project.basePath ?: return@executeOnPooledThread
             val newVersion = GoSdkUtils.retrieveGoVersion(newSdkPath) ?: return@executeOnPooledThread
             val rootDir = File(basePath)
-            val goWorkFile = File(rootDir, "go.work")
 
+            // .go-version is reconciled independently — it can coexist with go.work/go.mod
+            val goVersionFile = File(rootDir, ".go-version")
+            if (goVersionFile.exists()) {
+                reconcileGoVersionFile(project, newVersion, goVersionFile)
+            }
+
+            val goWorkFile = File(rootDir, "go.work")
             if (goWorkFile.exists()) {
                 reconcileWorkspace(project, newSdkPath, newVersion, goWorkFile)
             } else {
                 reconcileModules(project, newSdkPath, newVersion, rootDir)
             }
+        }
+    }
+
+    private fun reconcileGoVersionFile(project: Project, newVersion: String, goVersionFile: File) {
+        val pinnedVersion = GoSdkUtils.readGoVersionFile(goVersionFile) ?: return
+        if (pinnedVersion == newVersion) return
+
+        ApplicationManager.getApplication().invokeLater {
+            val notification = NotificationGroupManager.getInstance()
+                .getNotificationGroup("Go Plugin Notifications")
+                .createNotification(
+                    "Go Version Mismatch",
+                    ".go-version pins Go $pinnedVersion but selected SDK is Go $newVersion.",
+                    NotificationType.WARNING
+                )
+            notification.addAction(NotificationAction.createSimple("Update .go-version to $newVersion") {
+                notification.expire()
+                try {
+                    goVersionFile.writeText(newVersion)
+                } catch (e: Exception) {
+                    LOG.warn("Failed to update .go-version: ${e.message}")
+                }
+            })
+            notification.notify(project)
         }
     }
 

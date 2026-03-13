@@ -321,6 +321,23 @@ object GoSdkUtils {
         return 0
     }
 
+    /**
+     * Reads the version pinned by a `.go-version` file (used by goenv, asdf, mise).
+     * The file contains a bare version string like "1.22.0" or optionally "go1.22.0".
+     */
+    fun readGoVersionFile(file: File): String? {
+        if (!file.exists()) return null
+        return try {
+            val content = file.readText().trim()
+            // Accept both "1.22.0" and "go1.22.0"
+            val regex = """^(?:go)?(\d+\.\d+(?:\.\d+)?)""".toRegex()
+            regex.find(content)?.groupValues?.get(1)
+        } catch (e: Exception) {
+            LOG.debug("Failed to read .go-version file at ${file.absolutePath}: ${e.message}")
+            null
+        }
+    }
+
     fun readGoDirective(file: File): String? {
         val content = file.readText()
         val toolchainMatch = Regex("""^toolchain\s+go([\d.]+)""", RegexOption.MULTILINE).find(content)
