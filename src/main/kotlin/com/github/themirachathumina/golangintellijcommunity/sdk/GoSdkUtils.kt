@@ -157,60 +157,110 @@ object GoSdkUtils {
     fun suggestSdkHomePaths(): List<String> {
         LOG.debug("Suggesting SDK home paths...")
         val suggestions = mutableListOf<String>()
+        val home = System.getProperty("user.home")
+
+        // --- Environment variables ---
 
         System.getenv("GOROOT")?.let {
             LOG.debug("Checking GOROOT: $it")
             if (isValidSdkHome(it)) suggestions.add(it)
         }
 
+        // PATH entries whose parent looks like a Go SDK home (e.g. C:\Program Files\Go\bin)
         System.getenv("PATH")?.split(File.pathSeparator)?.forEach { pathEntry ->
             val dir = File(pathEntry)
-            // Look for a 'bin' directory where the path contains 'go' (e.g., C:\Program Files\Go\bin)
             if (dir.exists() && dir.isDirectory &&
                 dir.name.equals("bin", ignoreCase = true) &&
                 dir.absolutePath.contains("go", ignoreCase = true)) {
-
-                // The actual SDK Home is the parent of the 'bin' directory
                 val parentPath = dir.parentFile?.absolutePath
                 if (parentPath != null && isValidSdkHome(parentPath)) {
-                    println("Found valid home from PATH entry $pathEntry: $parentPath")
                     LOG.debug("Found valid home from PATH entry $pathEntry: $parentPath")
                     suggestions.add(parentPath)
                 }
             }
         }
 
-        // Check ~/sdk for SDKs downloaded by Go toolchain management (e.g. ~/sdk/go1.22.0)
-        val userSdkDir = File(System.getProperty("user.home"), "sdk")
-        if (userSdkDir.isDirectory) {
-            userSdkDir.listFiles()?.filter { it.isDirectory && it.name.startsWith("go") }?.forEach {
-                LOG.debug("Checking user SDK dir: ${it.absolutePath}")
-                if (isValidSdkHome(it.absolutePath)) suggestions.add(it.absolutePath)
+        // --- Go toolchain management: ~/sdk/go* ---
+        scanVersionedDir(File(home, "sdk"), prefix = "go", suggestions)
+
+        // --- Version managers ---
+
+        // gvm: ~/.gvm/gos/go*
+        scanVersionedDir(File(home, ".gvm/gos"), prefix = "go", suggestions)
+
+        // goenv: ~/.goenv/versions/*
+        scanVersionedDir(File(home, ".goenv/versions"), prefix = "", suggestions)
+
+        // asdf: ~/.asdf/installs/golang/*/go
+        val asdfGolangDir = File(home, ".asdf/installs/golang")
+        if (asdfGolangDir.isDirectory) {
+            asdfGolangDir.listFiles()?.filter { it.isDirectory }?.forEach { versionDir ->
+                // asdf wraps the SDK in a 'go' subdirectory
+                val sdkHome = File(versionDir, "go")
+                val path = if (sdkHome.isDirectory) sdkHome.absolutePath else versionDir.absolutePath
+                LOG.debug("Checking asdf golang install: $path")
+                if (isValidSdkHome(path)) suggestions.add(path)
             }
         }
 
+        // mise (formerly rtx): ~/.local/share/mise/installs/go/*
+        scanVersionedDir(File(home, ".local/share/mise/installs/go"), prefix = "", suggestions)
+
         if (SystemInfo.isWindows) {
+            // Standard installer locations
             listOf("C:\\Go", "C:\\Program Files\\Go").forEach {
                 LOG.debug("Checking Windows path: $it")
                 if (isValidSdkHome(it)) suggestions.add(it)
             }
+
+            // Scoop: ~/scoop/apps/go/current
+            val scoopCurrent = File(home, "scoop/apps/go/current")
+            LOG.debug("Checking Scoop: ${scoopCurrent.absolutePath}")
+            if (isValidSdkHome(scoopCurrent.absolutePath)) suggestions.add(scoopCurrent.absolutePath)
+
+            // Chocolatey: C:\ProgramData\chocolatey\lib\golang\tools
+            val chocoPath = "C:\\ProgramData\\chocolatey\\lib\\golang\\tools"
+            LOG.debug("Checking Chocolatey: $chocoPath")
+            if (isValidSdkHome(chocoPath)) suggestions.add(chocoPath)
+
         } else {
-            listOf("/usr/local/go", "/usr/bin/go", "/opt/homebrew/bin/go").forEach {
+            // Standard Unix locations
+            listOf("/usr/local/go", "/usr/lib/go").forEach {
                 LOG.debug("Checking Unix path: $it")
-                val file = File(it)
-                if (file.exists()) {
-                    val home = if (file.isDirectory) file.absolutePath else file.parentFile.parentFile?.absolutePath
-                    if (home != null && isValidSdkHome(home)) {
-                        LOG.debug("Found valid home from path $it: $home")
-                        suggestions.add(home)
-                    }
+                if (isValidSdkHome(it)) suggestions.add(it)
+            }
+
+            if (SystemInfo.isMac) {
+                // Homebrew on Apple Silicon: /opt/homebrew/Cellar/go/<version>/libexec
+                // Homebrew on Intel Mac:     /usr/local/Cellar/go/<version>/libexec
+                listOf("/opt/homebrew/Cellar/go", "/usr/local/Cellar/go").forEach { cellar ->
+                    scanVersionedDir(File(cellar), prefix = "", suggestions, subDir = "libexec")
                 }
             }
+
+            // snap: /snap/go/current
+            val snapPath = "/snap/go/current"
+            LOG.debug("Checking snap: $snapPath")
+            if (isValidSdkHome(snapPath)) suggestions.add(snapPath)
         }
 
         val result = suggestions.distinct()
         LOG.info("Suggested SDK paths: $result")
         return result
+    }
+
+    /**
+     * Lists immediate subdirectories of [dir] whose names start with [prefix],
+     * optionally descending into [subDir] within each, and adds valid SDK homes
+     * to [suggestions].
+     */
+    private fun scanVersionedDir(dir: File, prefix: String, suggestions: MutableList<String>, subDir: String? = null) {
+        if (!dir.isDirectory) return
+        dir.listFiles()?.filter { it.isDirectory && it.name.startsWith(prefix) }?.forEach { entry ->
+            val candidate = if (subDir != null) File(entry, subDir) else entry
+            LOG.debug("Checking versioned SDK dir: ${candidate.absolutePath}")
+            if (isValidSdkHome(candidate.absolutePath)) suggestions.add(candidate.absolutePath)
+        }
     }
 
     fun compareVersions(v1: String, v2: String): Int {
