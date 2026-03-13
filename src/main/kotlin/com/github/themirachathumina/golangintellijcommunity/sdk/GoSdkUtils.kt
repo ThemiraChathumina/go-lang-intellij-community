@@ -78,10 +78,33 @@ object GoSdkUtils {
         return isValid
     }
 
+    private fun readVersionFile(sdkHomePath: String): String? {
+        val versionFile = File(sdkHomePath, "VERSION")
+        if (!versionFile.exists()) return null
+        return try {
+            // Format: "go1.22.3" or "go1.22.3 cl/123456" or "devel ..." for tip builds
+            val content = versionFile.readText().trim()
+            val regex = """^go(\d+\.\d+(\.\d+)?)""".toRegex()
+            regex.find(content)?.groupValues?.get(1)
+        } catch (e: Exception) {
+            LOG.debug("Failed to read VERSION file at $sdkHomePath: ${e.message}")
+            null
+        }
+    }
+
     fun retrieveGoVersion(sdkHomePath: String): String? {
         val normalizedPath = FileUtil.toSystemIndependentName(sdkHomePath)
         versionCache[normalizedPath]?.let { return it }
 
+        // Fast path: read <GOROOT>/VERSION — no process spawn, works on any thread
+        val versionFromFile = readVersionFile(sdkHomePath)
+        if (versionFromFile != null) {
+            LOG.debug("Read Go version $versionFromFile from VERSION file for $normalizedPath")
+            versionCache[normalizedPath] = versionFromFile
+            return versionFromFile
+        }
+
+        // Slow path: fall back to spawning `go version` for non-standard installations
         val exePath = getGoExecutablePath(sdkHomePath)
         if (exePath == null) return null
 
