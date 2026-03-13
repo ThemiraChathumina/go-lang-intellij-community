@@ -20,6 +20,7 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
     class State {
         var sdkPaths: MutableSet<String> = mutableSetOf()
         var hasScannedInitial: Boolean = false
+        var sdkDownloadBaseUrl: String = DEFAULT_DOWNLOAD_URL
     }
 
     private var myState = State()
@@ -67,7 +68,14 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
         }
     }
 
+    fun getDownloadBaseUrl(): String = myState.sdkDownloadBaseUrl.ifBlank { DEFAULT_DOWNLOAD_URL }
+
+    fun setDownloadBaseUrl(url: String) {
+        myState.sdkDownloadBaseUrl = url.trimEnd('/')
+    }
+
     companion object {
+        const val DEFAULT_DOWNLOAD_URL = "https://go.dev/dl"
         val TOPIC = Topic.create("Go Global SDK Registry Changes", GoGlobalSdkRegistryListener::class.java)
         fun getInstance(): GoGlobalSdkRegistry = ApplicationManager.getApplication().getService(GoGlobalSdkRegistry::class.java)
     }

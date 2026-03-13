@@ -8,19 +8,22 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.util.io.Decompressor
 import com.intellij.util.io.HttpRequests
 import java.io.File
+import java.net.URI
 
 object GoSdkDownloader {
     private val LOG = Logger.getInstance(GoSdkDownloader::class.java)
+    private val proxyLock = Any()
 
     data class GoRelease(val version: String, val stable: Boolean, val files: List<GoFile>)
     data class GoFile(val filename: String, val os: String, val arch: String, val kind: String)
 
     fun fetchVersions(): List<String> {
-        try {
-            val json = HttpRequests.request("https://go.dev/dl/?mode=json&include=all").readString(null)
+        return try {
+            val baseUrl = GoGlobalSdkRegistry.getInstance().getDownloadBaseUrl()
+            val json = withProxyConfigured { HttpRequests.request("$baseUrl/?mode=json&include=all").readString(null) }
             val type = object : TypeToken<List<GoRelease>>() {}.type
             val releases: List<GoRelease> = Gson().fromJson(json, type)
-            return releases
+            releases
                 .filter { release ->
                     val version = Regex("""^go(\d+\.\d+(\.\d+)?)""").find(release.version)?.groupValues?.get(1)
                     version != null && GoSdkUtils.isSupportedVersion(version)
@@ -28,29 +31,30 @@ object GoSdkDownloader {
                 .map { it.version }
         } catch (e: Exception) {
             LOG.error("Failed to fetch Go versions", e)
-            return emptyList()
+            emptyList()
         }
     }
 
     fun downloadSdk(version: String, indicator: ProgressIndicator): String? {
         try {
+            val baseUrl = GoGlobalSdkRegistry.getInstance().getDownloadBaseUrl()
+
             indicator.text = "Fetching download links for $version..."
-            val json = HttpRequests.request("https://go.dev/dl/?mode=json&include=all").readString(null)
+            val json = withProxyConfigured { HttpRequests.request("$baseUrl/?mode=json&include=all").readString(null) }
             val type = object : TypeToken<List<GoRelease>>() {}.type
             val releases: List<GoRelease> = Gson().fromJson(json, type)
-            
+
             val release = releases.find { it.version == version } ?: return null
-            
+
             val targetOs = if (SystemInfo.isWindows) "windows" else if (SystemInfo.isMac) "darwin" else "linux"
             val targetArch = if (SystemInfo.isAarch64) "arm64" else "amd64"
-            val targetKind = "archive"
 
-            val fileInfo = release.files.find { it.os == targetOs && it.arch == targetArch && it.kind == targetKind } ?: return null
-            
-            val downloadUrl = "https://go.dev/dl/${fileInfo.filename}"
+            val fileInfo = release.files.find { it.os == targetOs && it.arch == targetArch && it.kind == "archive" } ?: return null
+
+            val downloadUrl = "$baseUrl/${fileInfo.filename}"
             val sdkBaseDir = File(System.getProperty("user.home"), "sdk")
             if (!sdkBaseDir.exists()) sdkBaseDir.mkdirs()
-            
+
             val archiveFile = File(sdkBaseDir, fileInfo.filename)
             val extractDir = File(sdkBaseDir, "tmp_$version")
             val destDir = File(sdkBaseDir, version)
@@ -61,18 +65,17 @@ object GoSdkDownloader {
             }
 
             indicator.text = "Downloading $version..."
-            HttpRequests.request(downloadUrl).saveToFile(archiveFile, indicator)
+            withProxyConfigured { HttpRequests.request(downloadUrl).saveToFile(archiveFile, indicator) }
 
             indicator.text = "Extracting $version..."
             if (archiveFile.name.endsWith(".zip")) {
-                Decompressor.Zip(archiveFile).extract(extractDir)
+                Decompressor.Zip(archiveFile.toPath()).extract(extractDir.toPath())
             } else if (archiveFile.name.endsWith(".tar.gz")) {
-                Decompressor.Tar(archiveFile).extract(extractDir)
+                Decompressor.Tar(archiveFile.toPath()).extract(extractDir.toPath())
             }
 
             archiveFile.delete()
 
-            // The archive extracts to a folder named 'go'. We move it to 'version' dir.
             val extractedGoDir = File(extractDir, "go")
             if (extractedGoDir.exists()) {
                 extractedGoDir.renameTo(destDir)
@@ -83,11 +86,69 @@ object GoSdkDownloader {
 
             val finalPath = destDir.absolutePath
             GoGlobalSdkRegistry.getInstance().addSdkPath(finalPath)
-            
             return finalPath
         } catch (e: Exception) {
             LOG.error("Failed to download Go SDK", e)
             return null
+        }
+    }
+
+    /**
+     * Reads proxy settings from the Go env file and system environment variables
+     * (HTTPS_PROXY / HTTP_PROXY and their lowercase variants), temporarily applies
+     * them as Java system properties for the duration of [block], then restores the
+     * previous values. Synchronized so concurrent downloads don't corrupt each other.
+     */
+    private fun <T> withProxyConfigured(block: () -> T): T {
+        val proxyUrl = resolveProxyUrl() ?: return block()
+
+        val parsed = parseProxyUrl(proxyUrl) ?: run {
+            LOG.debug("Could not parse proxy URL: $proxyUrl")
+            return block()
+        }
+        val (host, port, scheme) = parsed
+        val prefix = if (scheme == "http") "http" else "https"
+
+        synchronized(proxyLock) {
+            val prevHost = System.getProperty("$prefix.proxyHost")
+            val prevPort = System.getProperty("$prefix.proxyPort")
+            try {
+                System.setProperty("$prefix.proxyHost", host)
+                System.setProperty("$prefix.proxyPort", port.toString())
+                LOG.debug("Using proxy $host:$port for SDK download")
+                return block()
+            } finally {
+                if (prevHost != null) System.setProperty("$prefix.proxyHost", prevHost)
+                else System.clearProperty("$prefix.proxyHost")
+                if (prevPort != null) System.setProperty("$prefix.proxyPort", prevPort)
+                else System.clearProperty("$prefix.proxyPort")
+            }
+        }
+    }
+
+    /** Resolves the proxy URL to use, preferring the Go env file over system env vars. */
+    private fun resolveProxyUrl(): String? {
+        val goEnv = GoSdkUtils.readGoEnvFile()
+        return goEnv["HTTPS_PROXY"]
+            ?: goEnv["https_proxy"]
+            ?: goEnv["HTTP_PROXY"]
+            ?: goEnv["http_proxy"]
+            ?: System.getenv("HTTPS_PROXY")
+            ?: System.getenv("https_proxy")
+            ?: System.getenv("HTTP_PROXY")
+            ?: System.getenv("http_proxy")
+    }
+
+    /** Parses a proxy URL like "https://host:8080" into (host, port, scheme). */
+    private fun parseProxyUrl(proxyUrl: String): Triple<String, Int, String>? {
+        return try {
+            val url = URI(if (proxyUrl.contains("://")) proxyUrl else "http://$proxyUrl").toURL()
+            val host = url.host.takeIf { it.isNotBlank() } ?: return null
+            val port = if (url.port == -1) 8080 else url.port
+            val scheme = url.protocol ?: "http"
+            Triple(host, port, scheme)
+        } catch (e: Exception) {
+            null
         }
     }
 }

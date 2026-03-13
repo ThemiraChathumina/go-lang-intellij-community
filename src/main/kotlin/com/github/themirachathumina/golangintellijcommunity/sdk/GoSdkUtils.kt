@@ -201,8 +201,8 @@ object GoSdkUtils {
             if (isValidSdkHome(it)) suggestions.add(it)
         }
 
-        // All GOPATH entries from the env file may contain sdk/ subdirs with downloaded toolchains
-        goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { gopathEntry ->
+        // All GOPATH entries (env file + system) may contain sdk/ subdirs with downloaded toolchains
+        resolveGoPath().forEach { gopathEntry ->
             scanVersionedDir(File(gopathEntry, "sdk"), prefix = "go", suggestions)
         }
 
@@ -347,5 +347,29 @@ object GoSdkUtils {
 
     fun isSupportedVersion(version: String): Boolean {
         return compareVersions(version, MIN_SUPPORTED_VERSION) >= 0
+    }
+
+    /**
+     * Returns all effective GOPATH entries in priority order:
+     * Go env file first, then system env, then the default ~/go.
+     */
+    fun resolveGoPath(): List<String> {
+        val goEnv = readGoEnvFile()
+        return buildList {
+            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(it) }
+            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(it) }
+            add(File(System.getProperty("user.home"), "go").absolutePath)
+        }.distinct()
+    }
+
+    /**
+     * Returns the effective GOMODCACHE path: explicit env override if set,
+     * otherwise the default first-GOPATH/pkg/mod.
+     */
+    fun resolveGoModCache(): String {
+        val goEnv = readGoEnvFile()
+        goEnv["GOMODCACHE"]?.let { return it }
+        System.getenv("GOMODCACHE")?.let { return it }
+        return File(resolveGoPath().first(), "pkg/mod").absolutePath
     }
 }

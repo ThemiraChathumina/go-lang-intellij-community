@@ -27,7 +27,24 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
             val binPath = File(sdkPath, "bin").absolutePath
             commandLine.withEnvironment("PATH", "$binPath${File.pathSeparator}$oldPath")
         }
-        
+
+        // Pass GOPATH and GOMODCACHE so gopls resolves modules correctly in non-standard setups.
+        // Only set if they differ from what the process would inherit from the system environment,
+        // so we don't override a user's already-correct environment.
+        val effectiveGoPath = GoSdkUtils.resolveGoPath().joinToString(File.pathSeparator)
+        val systemGoPath = System.getenv("GOPATH") ?: ""
+        if (effectiveGoPath != systemGoPath) {
+            commandLine.withEnvironment("GOPATH", effectiveGoPath)
+            LOG.info("[Go-Lang-Community] Setting GOPATH for gopls: $effectiveGoPath")
+        }
+
+        val effectiveGoModCache = GoSdkUtils.resolveGoModCache()
+        val systemGoModCache = System.getenv("GOMODCACHE") ?: ""
+        if (effectiveGoModCache != systemGoModCache) {
+            commandLine.withEnvironment("GOMODCACHE", effectiveGoModCache)
+            LOG.info("[Go-Lang-Community] Setting GOMODCACHE for gopls: $effectiveGoModCache")
+        }
+
         super.setCommandLine(commandLine)
     }
 }
