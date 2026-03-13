@@ -53,6 +53,7 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
     }
 
     override fun isEnabled(@NotNull project: Project): Boolean {
+        if (!GoAppSettings.getInstance().state.lspEnabled) return false
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
         val isValid = sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)
         LOG.debug("[Go-Lang-Community] Checking if Go language server is enabled for ${project.name}: $isValid")

@@ -14,6 +14,7 @@ import com.intellij.openapi.components.Storage
 class GoAppSettings : PersistentStateComponent<GoAppSettings.State> {
 
     class State {
+        var lspEnabled: Boolean = true
         var semanticTokensEnabled: Boolean = false
     }
 
