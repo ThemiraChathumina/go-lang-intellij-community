@@ -1,6 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.lsp
 
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkService
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
@@ -35,7 +36,8 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
     }
 
     override fun isEnabled(@NotNull project: Project): Boolean {
-        val isValid = project.getService(GoSdkService::class.java).isSdkValid()
+        val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
+        val isValid = sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)
         LOG.debug("[Go-Lang-Community] Checking if Go language server is enabled for ${project.name}: $isValid")
         return isValid
     }

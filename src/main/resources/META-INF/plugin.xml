@@ -36,7 +36,6 @@
         <lang.quoteHandler language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoQuoteHandler"/>
         <spellchecker.support language="Go" implementationClass="com.github.themirachathumina.golangintellijcommunity.ide.GoSpellcheckingStrategy"/>
 
-        <sdkType implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkType"/>
         <editorNotificationProvider implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkEditorNotificationProvider"/>
         <postStartupActivity implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkAutoDetector"/>
         <statusBarWidgetFactory id="GoSdkStatusBarWidgetFactory" implementation="com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkStatusBarWidgetFactory"/>
@@ -78,9 +77,8 @@
     </extensions>
 
     <applicationListeners>
-        <listener class="com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkDetector"
+        <listener class="com.github.themirachathumina.golangintellijcommunity.sdk.GoLifecycleListener"
                   topic="com.intellij.ide.AppLifecycleListener"/>
     </applicationListeners>
-
 
 </idea-plugin>

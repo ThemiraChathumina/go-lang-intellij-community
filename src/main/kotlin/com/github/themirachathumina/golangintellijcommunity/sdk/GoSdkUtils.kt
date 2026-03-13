@@ -12,7 +12,10 @@ object GoSdkUtils {
     private val LOG = Logger.getInstance(GoSdkUtils::class.java)
     val GO_EXECUTABLE_NAME = if (SystemInfo.isWindows) "go.exe" else "go"
     val GOPLS_EXECUTABLE_NAME = if (SystemInfo.isWindows) "gopls.exe" else "gopls"
+    const val MIN_SUPPORTED_VERSION = "1.21"
+
     private val versionCache = mutableMapOf<String, String>()
+    private val pendingVersions = mutableSetOf<String>()
 
     fun getGoExecutablePath(sdkHomePath: String): String? {
         val binDir = File(sdkHomePath, "bin")
@@ -76,26 +79,36 @@ object GoSdkUtils {
     }
 
     fun retrieveGoVersion(sdkHomePath: String): String? {
-        println("Retrieving GO version $sdkHomePath")
         val normalizedPath = FileUtil.toSystemIndependentName(sdkHomePath)
-
         versionCache[normalizedPath]?.let { return it }
 
         val exePath = getGoExecutablePath(sdkHomePath)
-        if (exePath == null) {
-            println("Go executable not found")
-            LOG.warn("Cannot retrieve Go version: Go executable not found at $sdkHomePath")
+        if (exePath == null) return null
+
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            if (!pendingVersions.contains(normalizedPath)) {
+                pendingVersions.add(normalizedPath)
+                LOG.info("[Go-Lang-Community] Scheduling background version retrieval for: $normalizedPath")
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    try {
+                        doRetrieveGoVersion(normalizedPath, exePath)
+                    } finally {
+                        pendingVersions.remove(normalizedPath)
+                        // Notify registry to refresh UI
+                        ApplicationManager.getApplication().invokeLater({
+                            ApplicationManager.getApplication().messageBus.syncPublisher(GoGlobalSdkRegistry.TOPIC).sdkRegistryChanged()
+                        }, com.intellij.openapi.application.ModalityState.any())
+                    }
+                }
+            }
             return null
         }
 
-        if (ApplicationManager.getApplication().isDispatchThread && !versionCache.containsKey(normalizedPath)) {
-            println("retrieveGoVersion called from EDT for non-cached path: $normalizedPath. Returning null to avoid UI freeze.")
-            LOG.debug("retrieveGoVersion called from EDT for non-cached path: $normalizedPath. Returning null to avoid UI freeze.")
-            return null
-        }
+        return doRetrieveGoVersion(normalizedPath, exePath)
+    }
 
+    private fun doRetrieveGoVersion(normalizedPath: String, exePath: String): String? {
         try {
-            println("Running '$exePath version' to retrieve Go version...")
             LOG.debug("Running '$exePath version' to retrieve Go version...")
             val commandLine = GeneralCommandLine(exePath, "version")
             val handler = CapturingProcessHandler(commandLine)
@@ -107,21 +120,13 @@ object GoSdkUtils {
                 val match = regex.find(stdout)
                 val version = match?.groupValues?.get(1)
                 if (version != null) {
-                    println("Detected Go version $version for $sdkHomePath")
-                    LOG.info("Detected Go version $version for $sdkHomePath")
+                    LOG.info("Detected Go version $version for $normalizedPath")
                     versionCache[normalizedPath] = version
                     return version
-                } else {
-                    println("Failed to parse Go version from output: $stdout")
-                    LOG.warn("Failed to parse Go version from output: $stdout")
                 }
-            } else {
-                println("'go version' failed with exit code ${output.exitCode}. stderr: ${output.stderr}")
-                LOG.warn("'go version' failed with exit code ${output.exitCode}. stderr: ${output.stderr}")
             }
         } catch (e: Exception) {
-            println("Error retrieving Go version for $sdkHomePath")
-            LOG.error("Error retrieving Go version for $sdkHomePath", e)
+            LOG.error("Error retrieving Go version for $normalizedPath", e)
         }
         return null
     }
@@ -152,6 +157,15 @@ object GoSdkUtils {
             }
         }
 
+        // Check ~/sdk for SDKs downloaded by Go toolchain management (e.g. ~/sdk/go1.22.0)
+        val userSdkDir = File(System.getProperty("user.home"), "sdk")
+        if (userSdkDir.isDirectory) {
+            userSdkDir.listFiles()?.filter { it.isDirectory && it.name.startsWith("go") }?.forEach {
+                LOG.debug("Checking user SDK dir: ${it.absolutePath}")
+                if (isValidSdkHome(it.absolutePath)) suggestions.add(it.absolutePath)
+            }
+        }
+
         if (SystemInfo.isWindows) {
             listOf("C:\\Go", "C:\\Program Files\\Go").forEach {
                 LOG.debug("Checking Windows path: $it")
@@ -171,8 +185,23 @@ object GoSdkUtils {
             }
         }
 
-        val result = suggestions.distinct().sortedByDescending { retrieveGoVersion(it) ?: "" }
+        val result = suggestions.distinct()
         LOG.info("Suggested SDK paths: $result")
         return result
+    }
+
+    fun compareVersions(v1: String, v2: String): Int {
+        val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
+        val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
+        for (i in 0 until maxOf(parts1.size, parts2.size)) {
+            val p1 = parts1.getOrElse(i) { 0 }
+            val p2 = parts2.getOrElse(i) { 0 }
+            if (p1 != p2) return p1.compareTo(p2)
+        }
+        return 0
+    }
+
+    fun isSupportedVersion(version: String): Boolean {
+        return compareVersions(version, MIN_SUPPORTED_VERSION) >= 0
     }
 }

@@ -1,6 +1,5 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkService
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -18,8 +17,8 @@ class GoRunProfileState(
 ) : CommandLineState(env) {
 
     override fun startProcess(): ProcessHandler {
-        val goSdkService = environment.project.getService(GoSdkService::class.java)
-        val goExe = goSdkService.getGoExecutablePath()
+        val sdkPath = com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings.getInstance(environment.project).state.goSdkPath
+        val goExe = com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils.getGoExecutablePath(sdkPath)
             ?: throw ExecutionException("Go SDK is not configured for this project.")
         println("go exe: $goExe")
         // 1. Prepare temporary executable path
@@ -32,6 +31,13 @@ class GoRunProfileState(
         buildCmd.addParameter(config.targetPath)
         buildCmd.withWorkDirectory(config.workingDirectory)
         buildCmd.environment.putAll(config.envVariables)
+
+        if (sdkPath.isNotEmpty() && com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils.isValidSdkHome(sdkPath)) {
+            buildCmd.withEnvironment("GOROOT", sdkPath)
+            val oldPath = System.getenv("PATH") ?: ""
+            val binPath = File(sdkPath, "bin").absolutePath
+            buildCmd.withEnvironment("PATH", "$binPath${File.pathSeparator}$oldPath")
+        }
 
         val buildProcess = CapturingProcessHandler(buildCmd)
         var buildOutput: ProcessOutput? = null

@@ -15,9 +15,7 @@ class GoSdkStatusBarWidgetFactory : StatusBarWidgetFactory {
     override fun getDisplayName(): String = "Go SDK Version"
 
     override fun isAvailable(project: Project): Boolean {
-        val isAvailable = project.getService(GoSdkService::class.java).isSdkValid()
-        LOG.debug("[Go-Lang-Community] Go SDK widget available for ${project.name}: $isAvailable")
-        return isAvailable
+        return true
     }
 
     override fun createWidget(project: Project): StatusBarWidget {

@@ -1,130 +1,179 @@
 package com.github.themirachathumina.golangintellijcommunity.wizard
 
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkType
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistry
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkDownloader
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.ide.wizard.AbstractNewProjectWizardStep
 import com.intellij.ide.wizard.NewProjectWizardStep
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.projectRoots.ProjectJdkTable
-import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
-import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.Panel
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
+import com.intellij.icons.AllIcons
 import java.io.File
 import javax.swing.DefaultComboBoxModel
+
+import com.intellij.util.ui.AsyncProcessIcon
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
+
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistryListener
 
 class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardStep(parent) {
     private val LOG = Logger.getInstance(GoSettingsStep::class.java)
 
-    private val sdkProperty = propertyGraph.property<Sdk?>(null)
+    private val sdkProperty = propertyGraph.property<String?>(null)
     private var sdk by sdkProperty
 
-    // 1. Create a single, permanent model. NEVER replace this object!
-    private val sdkModel = DefaultComboBoxModel<Sdk>()
-
-    // 2. Inject the permanent model into the ComboBox immediately
+    private val sdkModel = DefaultComboBoxModel<String>()
     private val sdkComboBox = ComboBox(sdkModel)
-
-    private var isDetecting = false
+    private val loader = AsyncProcessIcon("GoVersionFetch").apply { isVisible = false }
 
     init {
         LOG.info("[Go-Lang-Community] Initializing GoSettingsStep")
-        val goSdkType = GoSdkType.getInstance()
-        val existingSdks = ProjectJdkTable.getInstance().getSdksOfType(goSdkType)
-
-        // 3. Set the renderer to handle our dynamic text
         sdkComboBox.renderer = textListCellRenderer {
-            it?.name ?: if (isDetecting) "Detecting Go SDK..." else "No SDK"
+            it?.let { path -> "Go ${GoSdkUtils.retrieveGoVersion(path) ?: ""} ($path)" } ?: "No SDK"
         }
+        
+        refreshSdkList()
 
-        if (existingSdks.isNotEmpty()) {
-            existingSdks.forEach { sdkModel.addElement(it) }
-            val bestSdk = existingSdks.maxByOrNull { it.versionString ?: "" }
-            sdkModel.selectedItem = bestSdk
-            sdk = bestSdk
-            LOG.info("[Go-Lang-Community] Using best existing Go SDK: ${sdk?.name}")
-        } else {
-            fetchSdkInBackground(goSdkType, null)
-        }
+        ApplicationManager.getApplication().messageBus.connect(context.disposable).subscribe(GoGlobalSdkRegistry.TOPIC, object : GoGlobalSdkRegistryListener {
+            override fun sdkRegistryChanged() {
+                ApplicationManager.getApplication().invokeLater({
+                    refreshSdkList()
+                }, ModalityState.any())
+            }
+        })
     }
 
-    private fun fetchSdkInBackground(goSdkType: GoSdkType, manualPath: String?) {
-        isDetecting = true
-        sdkComboBox.isEnabled = false
-
-        // Clear the model safely. This triggers the "Detecting..." text without breaking bindings!
+    private fun refreshSdkList(selectedPath: String? = null) {
         sdkModel.removeAllElements()
-
-        com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
-            LOG.info("[Go-Lang-Community] Running background SDK detection...")
-
-            val targetPath = manualPath ?: GoSdkUtils.suggestSdkHomePaths().firstOrNull()
-
-            if (targetPath != null) {
-                // Prime the cache safely in the background
-                GoSdkUtils.retrieveGoVersion(targetPath)
-
-                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
-                    com.intellij.openapi.application.ApplicationManager.getApplication().runWriteAction {
-                        val newSdk = SdkConfigurationUtil.createAndAddSDK(targetPath, goSdkType)
-
-                        // 4. THE MAGIC REFRESH: Mutate the existing model!
-                        val allSdks = ProjectJdkTable.getInstance().getSdksOfType(goSdkType)
-
-                        sdkModel.removeAllElements()
-                        allSdks.forEach { sdkModel.addElement(it) }
-
-                        if (newSdk != null) {
-                            sdkModel.selectedItem = newSdk
-                            sdk = newSdk
-                        }
-
-                        // Unlock the UI
-                        isDetecting = false
-                        sdkComboBox.isEnabled = true
-                    }
-                }
-            } else {
-                com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
-                    isDetecting = false
-                    sdkComboBox.isEnabled = true
-                }
-            }
+        val paths = GoGlobalSdkRegistry.getInstance().getSdkPaths().sortedByDescending { GoSdkUtils.retrieveGoVersion(it) ?: "" }
+        paths.forEach { sdkModel.addElement(it) }
+        
+        if (selectedPath != null && paths.contains(selectedPath)) {
+            sdkModel.selectedItem = selectedPath
+            sdk = selectedPath
+        } else if (paths.isNotEmpty()) {
+            sdkModel.selectedItem = paths.first()
+            sdk = paths.first()
         }
     }
 
     override fun setupUI(builder: Panel) {
         with(builder) {
             row("Go SDK:") {
-                val goSdkType = GoSdkType.getInstance()
-
                 cell(sdkComboBox)
                     .bindItem(::sdk)
                     .align(AlignX.FILL)
-                    // --- THE FIX: Use native UI DSL validation ---
                     .validationOnApply {
                         val projectDir = File(context.projectFileDirectory)
-
-                        // Strict check: If the directory exists and has files in it, block creation.
                         if (projectDir.exists() && projectDir.list()?.isNotEmpty() == true) {
-                            // This throws a UI error and paints a red border around the ComboBox!
                             error("A project or non-empty directory already exists at this location.")
                         } else {
-                            null // Validation passed
+                            null
                         }
                     }
 
-                button("Add SDK...") {
-                    SdkConfigurationUtil.selectSdkHome(goSdkType) { selectedPath ->
-                        LOG.info("[Go-Lang-Community] User selected SDK home: $selectedPath")
-                        fetchSdkInBackground(goSdkType, selectedPath)
-                    }
+                button("") {
+                    val group = DefaultActionGroup()
+                    
+                    group.add(object : AnAction("Add from Disk...") {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            val descriptor = FileChooserDescriptorFactory.createSingleFolderDescriptor()
+                            descriptor.title = "Select Go SDK Directory"
+                            FileChooser.chooseFile(descriptor, null, null) { file ->
+                                val path = file.path
+                                if (GoSdkUtils.isValidSdkHome(path)) {
+                                    GoGlobalSdkRegistry.getInstance().addSdkPath(path)
+                                    refreshSdkList(path)
+                                } else {
+                                    Messages.showErrorDialog("The selected directory is not a valid Go SDK.", "Invalid SDK")
+                                }
+                            }
+                        }
+                        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+                    })
+
+                    group.add(object : AnAction("Download...") {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            loader.isVisible = true
+                            loader.resume()
+
+                            val modalityState = ModalityState.current()
+
+                            ApplicationManager.getApplication().executeOnPooledThread {
+                                val versions = GoSdkDownloader.fetchVersions()
+                                
+                                ApplicationManager.getApplication().invokeLater({
+                                    loader.isVisible = false
+                                    loader.suspend()
+
+                                    if (versions.isEmpty()) {
+                                        Messages.showErrorDialog("Failed to fetch Go versions.", "Download Error")
+                                        return@invokeLater
+                                    }
+
+                                    val selectedVersion = Messages.showEditableChooseDialog(
+                                        "Select version to download:",
+                                        "Download Go SDK",
+                                        null,
+                                        versions.toTypedArray(),
+                                        versions.first(),
+                                        null
+                                    )
+
+                                    if (selectedVersion != null) {
+                                        ProgressManager.getInstance().run(object : Task.Modal(null, "Downloading Go SDK", true) {
+                                            override fun run(indicator: ProgressIndicator) {
+                                                val path = GoSdkDownloader.downloadSdk(selectedVersion, indicator)
+                                                if (path != null) {
+                                                    ApplicationManager.getApplication().invokeLater({
+                                                        refreshSdkList(path)
+                                                    }, ModalityState.any())
+                                                } else {
+                                                    ApplicationManager.getApplication().invokeLater({
+                                                        Messages.showErrorDialog("Failed to download Go SDK.", "Download Error")
+                                                    }, ModalityState.any())
+                                                }
+                                            }
+                                        })
+                                    }
+                                }, modalityState)
+                            }
+                        }
+                        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+                    })
+
+                    val source = it.source as javax.swing.JComponent
+                    val popup = JBPopupFactory.getInstance().createActionGroupPopup(
+                        null,
+                        group,
+                        com.intellij.ide.DataManager.getInstance().getDataContext(source),
+                        JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                        false
+                    )
+                    popup.showUnderneathOf(source)
+                }.applyToComponent {
+                    icon = AllIcons.General.Add
                 }
+
+                cell(loader)
             }
         }
     }
@@ -132,39 +181,30 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
     override fun setupProject(project: Project) {
         LOG.info("[Go-Lang-Community] Setting up project: ${project.name}")
         com.intellij.openapi.application.runWriteAction {
-            // 1. Set the SDK
             val selectedSdk = sdk
             if (selectedSdk != null) {
-                LOG.info("[Go-Lang-Community] Assigning SDK ${selectedSdk.name} to project ${project.name}")
-                ProjectRootManager.getInstance(project).projectSdk = selectedSdk
+                GoProjectSettings.getInstance(project).setSdkPath(selectedSdk)
             }
 
-            // --- THE FIX: Extract the Go version dynamically ---
-            // If selectedSdk.versionString is "1.22.5", this safely trims it to "1.22"
-            val rawVersion = selectedSdk?.versionString ?: "1.22"
+            val rawVersion = selectedSdk?.let { GoSdkUtils.retrieveGoVersion(it) } ?: "1.22"
             val modVersion = rawVersion.split(".").take(2).joinToString(".")
 
-            // 2. Initialize Go files in the project directory
             val projectDir = context.projectFileDirectory
 
             try {
                 val root = File(projectDir)
                 if (!root.exists()) {
-                    LOG.info("[Go-Lang-Community] Creating project directory: $projectDir")
                     root.mkdirs()
                 }
 
                 val name = context.projectName
                 val goModFile = File(root, "go.mod")
                 if (!goModFile.exists()) {
-                    LOG.info("[Go-Lang-Community] Creating go.mod for module $name with Go version $modVersion")
-                    // Inject the dynamic version here
                     goModFile.writeText("module $name\n\ngo $modVersion\n")
                 }
 
                 val mainGoFile = File(root, "main.go")
                 if (!mainGoFile.exists()) {
-                    LOG.info("[Go-Lang-Community] Creating main.go placeholder")
                     mainGoFile.writeText("""
                         package main
 
@@ -177,7 +217,6 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
                 }
             } catch (e: Exception) {
                 LOG.error("[Go-Lang-Community] Failed to initialize project files", e)
-                e.printStackTrace()
             }
         }
     }

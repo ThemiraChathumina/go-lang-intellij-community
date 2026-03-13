@@ -7,18 +7,11 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.projectRoots.ProjectJdkTable
-import com.intellij.openapi.projectRoots.Sdk
-import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
-import com.intellij.openapi.roots.ModuleRootModificationUtil
-import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.startup.ProjectActivity
-import com.intellij.openapi.util.io.FileUtil
 import com.redhat.devtools.lsp4ij.LanguageServerManager
 import java.io.File
 
@@ -27,67 +20,137 @@ class GoSdkAutoDetector : ProjectActivity {
 
     override suspend fun execute(project: Project) {
         val basePath = project.basePath ?: return
-
         val rootDir = File(basePath)
-        val isGoProject = rootDir.walkTopDown().maxDepth(2).any {
-            it.name == "go.mod" || it.name.endsWith(".go")
-        }
-
+        val isGoProject = rootDir.walkTopDown().maxDepth(2).any { it.name == "go.mod" || it.name.endsWith(".go") }
         if (!isGoProject) return
 
-        // 2. Check the currently assigned SDK
-        val currentSdk = ProjectRootManager.getInstance(project).projectSdk
-        if (currentSdk != null && currentSdk.sdkType is GoSdkType) {
-            val homePath = currentSdk.homePath
-
-            if (homePath != null && GoSdkUtils.isValidSdkHome(homePath)) {
-                LOG.info("GoSdkAutoDetector: Valid Go SDK already assigned: ${currentSdk.name}")
-                // THE FIX: Check for gopls before starting!
-                checkAndStartLanguageServer(project, currentSdk)
-                return
-            } else {
-                LOG.warn("GoSdkAutoDetector: Assigned Go SDK '${currentSdk.name}' is invalid.")
-            }
+        val settings = GoProjectSettings.getInstance(project)
+        if (settings.state.goSdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(settings.state.goSdkPath)) {
+            checkAndStartLanguageServer(project, settings.state.goSdkPath)
+            return
         }
 
-        // 3. Search for a valid Go SDK on the system
-        val suggestedPaths = GoSdkUtils.suggestSdkHomePaths()
-        if (suggestedPaths.isEmpty()) return
-
-        val bestPath = suggestedPaths.first()
-        GoSdkUtils.retrieveGoVersion(bestPath)
-
-        val goSdkType = GoSdkType.getInstance()
-
-        ApplicationManager.getApplication().invokeLater {
-            ApplicationManager.getApplication().runWriteAction {
-                val existingSdk = ProjectJdkTable.getInstance().allJdks.find {
-                    it.sdkType == goSdkType &&
-                            FileUtil.toSystemIndependentName(it.homePath ?: "") == FileUtil.toSystemIndependentName(bestPath)
-                }
-
-                val sdk = existingSdk ?: SdkConfigurationUtil.createAndAddSDK(bestPath, goSdkType)
-                if (sdk != null) {
-                    ProjectRootManager.getInstance(project).projectSdk = sdk
-                    SdkConfigurationUtil.setDirectoryProjectSdk(project, sdk)
-
-                    val modules = ModuleManager.getInstance(project).modules
-                    for (module in modules) {
-                        ModuleRootModificationUtil.setSdkInherited(module)
-                    }
-
-                    // THE FIX: Check for gopls before starting!
-                    checkAndStartLanguageServer(project, sdk)
-                }
-            }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            resolveSdkForProject(project, rootDir)
         }
     }
 
-    // --- NEW LOGIC: Manage the gopls lifecycle ---
+    private fun resolveSdkForProject(project: Project, rootDir: File) {
+        val goModFile = File(rootDir, "go.mod")
+        var requiredVersion: String? = null
 
-    private fun checkAndStartLanguageServer(project: Project, sdk: Sdk) {
-        val sdkHome = sdk.homePath ?: return
+        if (goModFile.exists()) {
+            val content = goModFile.readText()
+            val toolchainMatch = Regex("""^toolchain\s+go([\d.]+)""", RegexOption.MULTILINE).find(content)
+            val goMatch = Regex("""^go\s+([\d.]+)""", RegexOption.MULTILINE).find(content)
+            requiredVersion = toolchainMatch?.groupValues?.get(1) ?: goMatch?.groupValues?.get(1)
+        }
 
+        val registry = GoGlobalSdkRegistry.getInstance()
+        val allSdks = registry.getSdkPaths()
+
+        if (requiredVersion != null) {
+            val exactMatch = allSdks.find { GoSdkUtils.retrieveGoVersion(it) == requiredVersion }
+            if (exactMatch != null) {
+                assignAndStart(project, exactMatch)
+                return
+            }
+        }
+
+        val bestFallback = allSdks.maxByOrNull { GoSdkUtils.retrieveGoVersion(it) ?: "" }
+        if (bestFallback != null && requiredVersion == null) {
+            assignAndStart(project, bestFallback)
+            return
+        }
+
+        val systemPaths = GoSdkUtils.suggestSdkHomePaths()
+        val systemGo = systemPaths.firstOrNull()
+
+        if (systemGo != null) {
+            val sysVersion = GoSdkUtils.retrieveGoVersion(systemGo)
+            if (sysVersion != null && requiredVersion != null) {
+                if (compareVersions(sysVersion, requiredVersion) >= 0) {
+                    registry.addSdkPath(systemGo)
+                    assignAndStart(project, systemGo)
+                    return
+                } else if (compareVersions(sysVersion, "1.21") >= 0) {
+                    val downloadedRoot = runGoEnvGoroot(systemGo, rootDir)
+                    if (downloadedRoot != null && GoSdkUtils.isValidSdkHome(downloadedRoot)) {
+                        registry.addSdkPath(downloadedRoot)
+                        assignAndStart(project, downloadedRoot)
+                        return
+                    }
+                }
+            } else {
+                registry.addSdkPath(systemGo)
+                assignAndStart(project, systemGo)
+                return
+            }
+        }
+
+        promptMissingSdk(project, requiredVersion)
+    }
+
+    private fun compareVersions(v1: String, v2: String): Int {
+        val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
+        val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
+        for (i in 0 until maxOf(parts1.size, parts2.size)) {
+            val p1 = parts1.getOrElse(i) { 0 }
+            val p2 = parts2.getOrElse(i) { 0 }
+            if (p1 != p2) return p1.compareTo(p2)
+        }
+        return 0
+    }
+
+    private fun runGoEnvGoroot(systemGoPath: String, workDir: File): String? {
+        val goExe = GoSdkUtils.getGoExecutablePath(systemGoPath) ?: return null
+        return try {
+            val cmd = GeneralCommandLine(goExe, "env", "GOROOT").withWorkDirectory(workDir)
+            val handler = CapturingProcessHandler(cmd)
+            val output = handler.runProcess(30000)
+            if (output.exitCode == 0) output.stdout.trim() else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun assignAndStart(project: Project, path: String) {
+        ApplicationManager.getApplication().invokeLater {
+            GoProjectSettings.getInstance(project).setSdkPath(path)
+            checkAndStartLanguageServer(project, path)
+        }
+    }
+
+    private fun promptMissingSdk(project: Project, requiredVersion: String?) {
+        ApplicationManager.getApplication().invokeLater {
+            val notification = NotificationGroupManager.getInstance()
+                .getNotificationGroup("Go Plugin Notifications")
+                .createNotification(
+                    "Missing Go SDK",
+                    "This project requires Go ${requiredVersion ?: "SDK"}.",
+                    NotificationType.WARNING
+                )
+
+            notification.addAction(NotificationAction.createSimple("Download Go ${requiredVersion ?: "SDK"}") {
+                notification.expire()
+                if (requiredVersion != null) {
+                    ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Downloading Go SDK...", true) {
+                        override fun run(indicator: ProgressIndicator) {
+                            val targetVer = "go$requiredVersion"
+                            val path = GoSdkDownloader.downloadSdk(targetVer, indicator)
+                            if (path != null) {
+                                assignAndStart(project, path)
+                            }
+                        }
+                    })
+                }
+            })
+
+            notification.notify(project)
+        }
+    }
+
+    private fun checkAndStartLanguageServer(project: Project, sdkHome: String) {
         if (GoSdkUtils.isGoplsInstalled(sdkHome)) {
             ApplicationManager.getApplication().invokeLater {
                 LOG.info("GoSdkAutoDetector: Starting gopls for ${project.name}")
@@ -108,7 +171,7 @@ class GoSdkAutoDetector : ProjectActivity {
             )
 
         notification.addAction(NotificationAction.createSimple("Install gopls") {
-            notification.expire() // Dismiss the balloon when clicked
+            notification.expire()
             installGoplsInBackground(project, sdkHome)
         })
 
@@ -116,7 +179,6 @@ class GoSdkAutoDetector : ProjectActivity {
     }
 
     private fun installGoplsInBackground(project: Project, sdkHome: String) {
-        // This spins up the native IntelliJ background progress bar in the bottom right corner
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Installing gopls...", true) {
             override fun run(indicator: ProgressIndicator) {
                 indicator.isIndeterminate = true
@@ -130,33 +192,17 @@ class GoSdkAutoDetector : ProjectActivity {
 
                 try {
                     val cmd = GeneralCommandLine(goExe, "install", "golang.org/x/tools/gopls@latest")
+                        .withEnvironment("GOROOT", sdkHome)
                     val handler = CapturingProcessHandler(cmd)
-
-                    // Allow up to 2 minutes. Compiling gopls downloads a lot of dependencies!
                     val output = handler.runProcess(120 * 1000)
 
                     if (output.exitCode == 0) {
                         LOG.info("Successfully installed gopls.")
-
-                        NotificationGroupManager.getInstance()
-                            .getNotificationGroup("Go Plugin Notifications")
-                            .createNotification(
-                                "Go Language Server Installed",
-                                "gopls was successfully installed and started.",
-                                NotificationType.INFORMATION
-                            )
-                            .notify(project)
-
-                        // It's installed! Tell lsp4ij to start it up.
                         ApplicationManager.getApplication().invokeLater {
                             LanguageServerManager.getInstance(project).start("gopls")
                         }
                     } else {
                         LOG.warn("Failed to install gopls: ${output.stderr}")
-                        NotificationGroupManager.getInstance()
-                            .getNotificationGroup("Go Plugin Notifications")
-                            .createNotification("Installation Failed", "Could not install gopls. Check idea.log for details.", NotificationType.ERROR)
-                            .notify(project)
                     }
                 } catch (e: Exception) {
                     LOG.error("Error during gopls installation", e)
