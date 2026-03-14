@@ -108,10 +108,21 @@ class GoRunProfileState(
 
     private fun createExternalTerminalCommandLine(exePath: String, config: GoRunConfiguration): GeneralCommandLine {
         return if (SystemInfo.isWindows) {
-            // Using 'call' prevents cmd.exe from stripping quotes if the command starts with one.
-            // This is a robust way to handle paths with spaces when using cmd /c.
-            val command = "call \"$exePath\" ${config.programArguments} & pause"
-            GeneralCommandLine("cmd.exe", "/c", "start", "/wait", "cmd.exe", "/c", command)
+            // To avoid complex nested quoting issues with cmd.exe /c and GeneralCommandLine's own escaping,
+            // we create a temporary batch file that launches the application and pauses.
+            val tempBat = FileUtil.createTempFile("go_run_", ".bat", true)
+            val batContent = """
+                @echo off
+                "$exePath" ${config.programArguments}
+                if %errorlevel% neq 0 (
+                    echo.
+                    echo Process finished with exit code %errorlevel%
+                )
+                pause
+            """.trimIndent()
+            FileUtil.writeToFile(tempBat, batContent)
+            
+            GeneralCommandLine("cmd.exe", "/c", "start", "/wait", tempBat.absolutePath)
         } else if (SystemInfo.isMac) {
             GeneralCommandLine("open", "-a", "Terminal", exePath)
         } else {
