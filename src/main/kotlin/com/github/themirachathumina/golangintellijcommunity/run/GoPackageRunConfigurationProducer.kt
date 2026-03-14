@@ -27,11 +27,7 @@ class GoPackageRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConf
 
         val mainFiles = directory.files.filter { GoRunAnalyzer.isMainPackage(it) }
 
-        if (location is PsiDirectory) {
-            if (mainFiles.isEmpty()) return false
-        } else {
-            if (mainFiles.size <= 1) return false
-        }
+        if (mainFiles.none { GoRunAnalyzer.hasFuncMain(it) }) return false
 
         val virtualDir = directory.virtualFile
 

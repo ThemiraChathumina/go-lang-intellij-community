@@ -27,7 +27,7 @@ class GoRunLineMarkerContributor : RunLineMarkerContributor() {
         // 5. Return the green Play icon, a tooltip, and the executable actions
         return Info(
             AllIcons.RunConfigurations.TestState.Run,
-            { "Run 'main.go'" },
+            { "Run '${file.name}'" },
             *actions
         )
     }

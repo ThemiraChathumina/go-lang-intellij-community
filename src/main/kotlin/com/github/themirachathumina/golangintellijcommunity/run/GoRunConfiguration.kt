@@ -1,64 +1,163 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.*
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import com.intellij.util.xmlb.XmlSerializer
+import com.intellij.util.xmlb.annotations.Attribute
+import com.intellij.util.xmlb.annotations.Tag
+import com.intellij.util.xmlb.annotations.XMap
 import org.jdom.Element
+
+enum class GoBuildMode { DEFAULT, DEBUG, RELEASE }
 
 class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     LocatableConfigurationBase<RunProfileState>(project, factory, name) {
 
-    var runKind: GoRunKind = GoRunKind.FILE
-    var targetPath: String = ""
-    var workingDirectory: String = project.basePath ?: ""
-    var programArguments: String = ""
-    var goToolArguments: String = ""
-    var envVariables: MutableMap<String, String> = mutableMapOf()
+    private var state = GoRunConfigurationState()
 
-    // 1. Returns the UI component for the Edit Run Configuration dialog
+    var runKind: GoRunKind
+        get() = state.runKind
+        set(value) { state.runKind = value }
+
+    var targetPath: String
+        get() = state.targetPath
+        set(value) { state.targetPath = value }
+
+    var workingDirectory: String
+        get() = state.workingDirectory
+        set(value) { state.workingDirectory = value }
+
+    var programArguments: String
+        get() = state.programArguments
+        set(value) { state.programArguments = value }
+
+    var goToolArguments: String
+        get() = state.goToolArguments
+        set(value) { state.goToolArguments = value }
+
+    var envVariables: MutableMap<String, String>
+        get() = state.envVariables
+        set(value) { state.envVariables = value }
+
+    var enableRace: Boolean
+        get() = state.enableRace
+        set(value) { state.enableRace = value }
+
+    var buildTags: String
+        get() = state.buildTags
+        set(value) { state.buildTags = value }
+
+    var buildMode: GoBuildMode
+        get() = state.buildMode
+        set(value) { state.buildMode = value }
+
+    var goOS: String
+        get() = state.goOS
+        set(value) { state.goOS = value }
+
+    var goArch: String
+        get() = state.goArch
+        set(value) { state.goArch = value }
+
+    var cgoEnabled: Boolean
+        get() = state.cgoEnabled
+        set(value) { state.cgoEnabled = value }
+
+    var outputPath: String
+        get() = state.outputPath
+        set(value) { state.outputPath = value }
+
+    var goProxy: String
+        get() = state.goProxy
+        set(value) { state.goProxy = value }
+
+    var stdinFilePath: String
+        get() = state.stdinFilePath
+        set(value) { state.stdinFilePath = value }
+
+    var runInExternalTerminal: Boolean
+        get() = state.runInExternalTerminal
+        set(value) { state.runInExternalTerminal = value }
+
+    var timeoutSeconds: Int
+        get() = state.timeoutSeconds
+        set(value) { state.timeoutSeconds = value }
+
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         return GoRunSettingsEditor(project)
     }
 
-    // 2. Returns the execution engine when the user clicks "Play"
+    override fun checkConfiguration() {
+        if (targetPath.isBlank()) {
+            throw RuntimeConfigurationError("Target path is not specified")
+        }
+
+        val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
+        if (sdkPath.isBlank() || !GoSdkUtils.isValidSdkHome(sdkPath)) {
+            throw RuntimeConfigurationError("Go SDK is not configured for this project")
+        }
+    }
+
     override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState {
         return GoRunProfileState(environment, this)
     }
 
-    // 3. Save settings to disk
     override fun writeExternal(element: Element) {
         super.writeExternal(element)
-        element.setAttribute("runKind", runKind.name)
-        element.setAttribute("targetPath", targetPath)
-        element.setAttribute("workingDirectory", workingDirectory)
-        element.setAttribute("programArguments", programArguments)
-        element.setAttribute("goToolArguments", goToolArguments)
-
-        val envsElement = Element("envs")
-        envVariables.forEach { (k, v) ->
-            val env = Element("env")
-            env.setAttribute("name", k)
-            env.setAttribute("value", v)
-            envsElement.addContent(env)
-        }
-        element.addContent(envsElement)
+        XmlSerializer.serializeInto(state, element)
     }
 
-    // 4. Read settings from disk
     override fun readExternal(element: Element) {
         super.readExternal(element)
-        runKind = GoRunKind.valueOf(element.getAttributeValue("runKind") ?: GoRunKind.FILE.name)
-        targetPath = element.getAttributeValue("targetPath") ?: ""
-        workingDirectory = element.getAttributeValue("workingDirectory") ?: ""
-        programArguments = element.getAttributeValue("programArguments") ?: ""
-        goToolArguments = element.getAttributeValue("goToolArguments") ?: ""
+        XmlSerializer.deserializeInto(state, element)
+    }
 
-        val envsElement = element.getChild("envs")
-        envVariables.clear()
-        envsElement?.getChildren("env")?.forEach {
-            envVariables[it.getAttributeValue("name")] = it.getAttributeValue("value")
-        }
+    private class GoRunConfigurationState {
+        @Attribute("runKind")
+        var runKind: GoRunKind = GoRunKind.FILE
+        @Attribute("targetPath")
+        var targetPath: String = ""
+        @Attribute("workingDirectory")
+        var workingDirectory: String = ""
+        @Attribute("programArguments")
+        var programArguments: String = ""
+        @Attribute("goToolArguments")
+        var goToolArguments: String = ""
+
+        @Tag("envs")
+        @XMap(entryTagName = "env", keyAttributeName = "name", valueAttributeName = "value")
+        var envVariables: MutableMap<String, String> = mutableMapOf()
+
+        @Attribute("enableRace")
+        var enableRace: Boolean = false
+        @Attribute("buildTags")
+        var buildTags: String = ""
+        @Attribute("buildMode")
+        var buildMode: GoBuildMode = GoBuildMode.DEFAULT
+        @Attribute("goOS")
+        var goOS: String = ""
+        @Attribute("goArch")
+        var goArch: String = ""
+        @Attribute("cgoEnabled")
+        var cgoEnabled: Boolean = false
+        @Attribute("outputPath")
+        var outputPath: String = ""
+        @Attribute("goProxy")
+        var goProxy: String = ""
+        @Attribute("stdinFilePath")
+        var stdinFilePath: String = ""
+        @Attribute("runInExternalTerminal")
+        var runInExternalTerminal: Boolean = false
+        @Attribute("timeoutSeconds")
+        var timeoutSeconds: Int = 0
+    }
+
+    init {
+        workingDirectory = project.basePath ?: ""
     }
 }
