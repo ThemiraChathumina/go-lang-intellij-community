@@ -166,6 +166,7 @@ class GoRunProcessHandler(
                 if (event.exitCode == 0) {
                     runApplication()
                 } else {
+                    notifyTextAvailable("\nBuild finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
                     notifyProcessTerminated(event.exitCode)
                 }
             }
@@ -188,6 +189,7 @@ class GoRunProcessHandler(
             }
 
             override fun processTerminated(event: ProcessEvent) {
+                notifyTextAvailable("\nProcess finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
                 notifyProcessTerminated(event.exitCode)
             }
         })
