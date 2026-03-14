@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.RawCommandLineEditor
 import com.intellij.ui.components.JBCheckBox
@@ -18,6 +19,7 @@ import com.intellij.ui.dsl.builder.panel
 import javax.swing.ButtonGroup
 import javax.swing.JComponent
 import javax.swing.JLabel
+import javax.swing.event.DocumentEvent
 
 class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunConfiguration>() {
 
@@ -29,10 +31,16 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
     private var currentKind = GoRunKind.FILE
 
     private val fileRadioButton = JBRadioButton("File", true).apply {
-        addActionListener { updateUI() }
+        addActionListener { 
+            updateUI()
+            fireEditorStateChanged()
+        }
     }
     private val packageRadioButton = JBRadioButton("Package").apply {
-        addActionListener { updateUI() }
+        addActionListener { 
+            updateUI()
+            fireEditorStateChanged()
+        }
     }
     private val kindGroup = ButtonGroup().apply {
         add(fileRadioButton)
@@ -40,6 +48,9 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
     }
 
     private val targetPathField = TextFieldWithBrowseButton().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
         addBrowseFolderListener("Select Target", null, project, object : FileChooserDescriptor(true, true, false, false, false, false) {
             override fun isFileSelectable(file: VirtualFile?): Boolean {
                 return if (currentKind == GoRunKind.FILE) {
@@ -59,30 +70,71 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
     }
 
     private val workingDirField = TextFieldWithBrowseButton().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
         addBrowseFolderListener("Select Working Directory", null, project, FileChooserDescriptorFactory.createSingleFolderDescriptor())
     }
-    private val programArgsField = RawCommandLineEditor()
-    private val goToolArgsField = RawCommandLineEditor()
-    private val envVarsComponent = EnvironmentVariablesComponent()
+    private val programArgsField = RawCommandLineEditor().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
+    }
+    private val goToolArgsField = RawCommandLineEditor().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
+    }
+    private val envVarsComponent = EnvironmentVariablesComponent().apply {
+        addChangeListener { fireEditorStateChanged() }
+    }
 
     // New Build Options
-    private val enableRaceCheckBox = JBCheckBox("Enable race detector (-race)")
-    private val buildTagsField = JBTextField()
-    private val buildModeComboBox = ComboBox(GoBuildMode.entries.toTypedArray())
+    private val enableRaceCheckBox = JBCheckBox("Enable race detector (-race)").apply {
+        addActionListener { fireEditorStateChanged() }
+    }
+    private val buildTagsField = JBTextField().apply {
+        document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
+    }
+    private val buildModeComboBox = ComboBox(GoBuildMode.entries.toTypedArray()).apply {
+        addActionListener { fireEditorStateChanged() }
+    }
     
     // More Options
-    private val goOsComboBox = ComboBox(GOOS_VALUES.toTypedArray())
-    private val goArchComboBox = ComboBox(GOARCH_VALUES.toTypedArray())
-    private val cgoEnabledCheckBox = JBCheckBox("Enable CGO")
+    private val goOsComboBox = ComboBox(GOOS_VALUES.toTypedArray()).apply {
+        addActionListener { fireEditorStateChanged() }
+    }
+    private val goArchComboBox = ComboBox(GOARCH_VALUES.toTypedArray()).apply {
+        addActionListener { fireEditorStateChanged() }
+    }
+    private val cgoEnabledCheckBox = JBCheckBox("Enable CGO").apply {
+        addActionListener { fireEditorStateChanged() }
+    }
     private val outputPathField = TextFieldWithBrowseButton().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
         addBrowseFolderListener("Select Output Path", null, project, FileChooserDescriptorFactory.createSingleFileOrFolderDescriptor())
     }
-    private val goProxyField = JBTextField()
+    private val goProxyField = JBTextField().apply {
+        document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
+    }
     private val stdinFilePathField = TextFieldWithBrowseButton().apply {
+        textField.document.addDocumentListener(object : DocumentAdapter() {
+            override fun textChanged(e: DocumentEvent) = fireEditorStateChanged()
+        })
         addBrowseFolderListener("Select Stdin File", null, project, FileChooserDescriptorFactory.createSingleFileDescriptor())
     }
-    private val timeoutSecondsSpinner = JBIntSpinner(0, 0, 3600)
-    private val runInExternalTerminalCheckBox = JBCheckBox("Run in external terminal")
+    private val timeoutSecondsSpinner = JBIntSpinner(0, 0, 3600).apply {
+        addChangeListener { fireEditorStateChanged() }
+    }
+    private val runInExternalTerminalCheckBox = JBCheckBox("Run in external terminal").apply {
+        addActionListener { fireEditorStateChanged() }
+    }
 
     private var targetPathLabel: JLabel? = null
 
