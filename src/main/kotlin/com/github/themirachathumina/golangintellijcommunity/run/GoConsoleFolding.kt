@@ -6,27 +6,26 @@ import com.intellij.openapi.project.Project
 class GoConsoleFolding : ConsoleFolding() {
 
     override fun shouldFoldLine(project: Project, line: String): Boolean {
+        // We fold based on the exact structure we produce in GoRunProcessHandler
+        
+        // 1. Indented lines (command lines and build output)
+        if (line.startsWith("  ")) {
+            return true
+        }
+        
         val trimmed = line.trim()
         
-        // 1. Fold the headers we explicitly print in GoRunProcessHandler
-        if (trimmed.startsWith("Building Go Application:") || 
-            trimmed.startsWith("Running Application:")) {
+        // 2. Main headers
+        if (trimmed == "Building Go Application:" || 
+            trimmed == "Running Application:") {
             return true
         }
         
-        // 2. Fold the command lines printed by the process handler.
-        // Heuristic: Check if it looks like a go build command or a temp executable run.
-        if (trimmed.contains("go build") || trimmed.contains("go.exe\" build")) {
+        // 3. Status messages at the end of build/run
+        if (trimmed.startsWith("Build finished with exit code") || 
+            trimmed.startsWith("Process finished with exit code")) {
             return true
         }
-        
-        // Heuristic: Temp build binaries usually follow this pattern
-        if (trimmed.contains("go_build_") && (trimmed.endsWith(".exe") || !trimmed.contains(" "))) {
-            return true
-        }
-        
-        // 3. Fold empty lines that surround these headers to keep the block compact
-        if (trimmed.isEmpty()) return true
 
         return false
     }

@@ -152,21 +152,39 @@ class GoRunProcessHandler(
     private fun runBuild() {
         if (isDestroyed) return
         
-        notifyTextAvailable("Building Go Application: ${buildCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("Building Go Application:\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("  ${buildCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
         
         val buildHandler = OSProcessHandler(buildCmd)
         activeHandler = buildHandler
         
         buildHandler.addProcessListener(object : ProcessAdapter() {
+            private var lastLineFinished = true
+            private var firstLineSkipped = false
+            
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                notifyTextAvailable(event.text, outputType)
+                val text = event.text
+                if (text.isEmpty()) return
+                
+                // OSProcessHandler typically sends the command line as the first text event.
+                // We skip it because we already printed it manually (and better formatted).
+                if (!firstLineSkipped && text.endsWith("\n")) {
+                    firstLineSkipped = true
+                    return
+                }
+                
+                // Indent build output to mark it as part of build details
+                val output = if (lastLineFinished) "  " + text else text
+                lastLineFinished = text.endsWith("\n")
+                
+                notifyTextAvailable(output, ProcessOutputTypes.SYSTEM)
             }
 
             override fun processTerminated(event: ProcessEvent) {
                 if (event.exitCode == 0) {
                     runApplication()
                 } else {
-                    notifyTextAvailable("\nBuild finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
+                    notifyTextAvailable("Build finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
                     notifyProcessTerminated(event.exitCode)
                 }
             }
@@ -178,18 +196,30 @@ class GoRunProcessHandler(
     private fun runApplication() {
         if (isDestroyed) return
         
-        notifyTextAvailable("\nRunning Application: ${runCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("Running Application:\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("  ${runCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
         
         val runHandler = OSProcessHandler(runCmd)
         activeHandler = runHandler
         
         runHandler.addProcessListener(object : ProcessAdapter() {
+            private var firstLineSkipped = false
+
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                notifyTextAvailable(event.text, outputType)
+                val text = event.text
+                if (text.isEmpty()) return
+
+                // Skip the initial command line output from OSProcessHandler
+                if (!firstLineSkipped && text.endsWith("\n")) {
+                    firstLineSkipped = true
+                    return
+                }
+
+                notifyTextAvailable(text, outputType)
             }
 
             override fun processTerminated(event: ProcessEvent) {
-                notifyTextAvailable("\nProcess finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
+                notifyTextAvailable("Process finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
                 notifyProcessTerminated(event.exitCode)
             }
         })

@@ -5,7 +5,7 @@ import com.intellij.execution.configurations.ConfigurationTypeBase
 
 class GoRunConfigurationType : ConfigurationTypeBase(
     "GoRunConfiguration",
-    "Go Build",
+    "Go",
     "Run a Go application",
     GoIcons.FILE
 ) {

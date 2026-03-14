@@ -350,6 +350,27 @@ object GoSdkUtils {
     }
 
     /**
+     * Executes `go env <vars...>` and returns a map of the requested environment variables.
+     */
+    fun fetchGoEnv(sdkHomePath: String, vararg vars: String): Map<String, String> {
+        val exePath = getGoExecutablePath(sdkHomePath) ?: return emptyMap()
+        try {
+            val commandLine = GeneralCommandLine(exePath, "env").apply {
+                addParameters(*vars)
+            }
+            val handler = CapturingProcessHandler(commandLine)
+            val output = handler.runProcess(3000)
+            if (output.exitCode == 0) {
+                val lines = output.stdoutLines
+                return vars.zip(lines).toMap()
+            }
+        } catch (e: Exception) {
+            LOG.debug("Failed to fetch go env: ${e.message}")
+        }
+        return emptyMap()
+    }
+
+    /**
      * Returns all effective GOPATH entries in priority order:
      * Go env file first, then system env, then the default ~/go.
      */

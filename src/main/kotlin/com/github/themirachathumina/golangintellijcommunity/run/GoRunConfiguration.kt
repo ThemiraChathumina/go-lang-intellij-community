@@ -185,7 +185,21 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
         }
     }
 
+    /**
+     * Pre-fills GOOS, GOARCH, and GOPROXY from the currently configured Go SDK.
+     */
+    fun prefillWithSystemDefaults() {
+        val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
+        if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
+            val env = GoSdkUtils.fetchGoEnv(sdkPath, "GOOS", "GOARCH", "GOPROXY")
+            env["GOOS"]?.let { if (goOS.isEmpty()) goOS = it }
+            env["GOARCH"]?.let { if (goArch.isEmpty()) goArch = it }
+            env["GOPROXY"]?.let { if (goProxy.isEmpty()) goProxy = it }
+        }
+    }
+
     init {
         workingDirectory = project.basePath ?: ""
+        prefillWithSystemDefaults()
     }
 }

@@ -69,7 +69,7 @@
         <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
         <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>
 
-        <consoleFolding implementation="com.github.themirachathumina.golangintellijcommunity.run.GoConsoleFolding"/>
+        <consoleFolding implementation="com.github.themirachathumina.golangintellijcommunity.run.GoConsoleFolding" shouldBeFoldedByDefault="true"/>
 
         <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
 
