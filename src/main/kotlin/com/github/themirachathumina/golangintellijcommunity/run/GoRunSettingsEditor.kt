@@ -5,10 +5,14 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.RawCommandLineEditor
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBRadioButton
+import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.panel
 import javax.swing.ButtonGroup
@@ -16,6 +20,11 @@ import javax.swing.JComponent
 import javax.swing.JLabel
 
 class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunConfiguration>() {
+
+    companion object {
+        private val GOOS_VALUES = listOf("", "linux", "windows", "darwin", "freebsd", "netbsd", "openbsd", "plan9", "solaris", "android", "dragonfly", "illumos", "js", "aix")
+        private val GOARCH_VALUES = listOf("", "amd64", "386", "arm", "arm64", "ppc64", "ppc64le", "mips", "mipsle", "mips64", "mips64le", "s390x", "wasm", "riscv64")
+    }
 
     private var currentKind = GoRunKind.FILE
 
@@ -56,6 +65,25 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
     private val goToolArgsField = RawCommandLineEditor()
     private val envVarsComponent = EnvironmentVariablesComponent()
 
+    // New Build Options
+    private val enableRaceCheckBox = JBCheckBox("Enable race detector (-race)")
+    private val buildTagsField = JBTextField()
+    private val buildModeComboBox = ComboBox(GoBuildMode.entries.toTypedArray())
+    
+    // More Options
+    private val goOsComboBox = ComboBox(GOOS_VALUES.toTypedArray())
+    private val goArchComboBox = ComboBox(GOARCH_VALUES.toTypedArray())
+    private val cgoEnabledCheckBox = JBCheckBox("Enable CGO")
+    private val outputPathField = TextFieldWithBrowseButton().apply {
+        addBrowseFolderListener("Select Output Path", null, project, FileChooserDescriptorFactory.createSingleFileOrFolderDescriptor())
+    }
+    private val goProxyField = JBTextField()
+    private val stdinFilePathField = TextFieldWithBrowseButton().apply {
+        addBrowseFolderListener("Select Stdin File", null, project, FileChooserDescriptorFactory.createSingleFileDescriptor())
+    }
+    private val timeoutSecondsSpinner = JBIntSpinner(0, 0, 3600)
+    private val runInExternalTerminalCheckBox = JBCheckBox("Run in external terminal")
+
     private var targetPathLabel: JLabel? = null
 
     override fun createEditor(): JComponent {
@@ -89,6 +117,37 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
                     cell(envVarsComponent).align(AlignX.FILL)
                 }
             }
+
+            group("Build Options") {
+                row {
+                    cell(enableRaceCheckBox)
+                }
+                row("Build tags:") {
+                    cell(buildTagsField).align(AlignX.FILL)
+                }.comment("e.g. dev,integration")
+                row("Build mode:") {
+                    cell(buildModeComboBox).align(AlignX.FILL)
+                }
+
+                collapsibleGroup("More options") {
+                    row("GOOS:") { cell(goOsComboBox).align(AlignX.FILL) }
+                    row("GOARCH:") { cell(goArchComboBox).align(AlignX.FILL) }
+                    row { cell(cgoEnabledCheckBox) }
+                    row("Output binary:") {
+                        cell(outputPathField).align(AlignX.FILL)
+                    }
+                    row("GOPROXY:") {
+                        cell(goProxyField).align(AlignX.FILL)
+                    }.comment("e.g. off, direct, https://proxy.corp")
+                    row("Redirect stdin from file:") {
+                        cell(stdinFilePathField).align(AlignX.FILL)
+                    }
+                    row("Timeout (seconds):") {
+                        cell(timeoutSecondsSpinner)
+                    }
+                    row { cell(runInExternalTerminalCheckBox) }
+                }
+            }
         }
     }
 
@@ -111,6 +170,19 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
         programArgsField.text = config.programArguments
         goToolArgsField.text = config.goToolArguments
         envVarsComponent.envs = config.envVariables
+
+        // New fields
+        enableRaceCheckBox.isSelected = config.enableRace
+        buildTagsField.text = config.buildTags
+        buildModeComboBox.item = config.buildMode
+        goOsComboBox.item = config.goOS
+        goArchComboBox.item = config.goArch
+        cgoEnabledCheckBox.isSelected = config.cgoEnabled
+        outputPathField.text = config.outputPath
+        goProxyField.text = config.goProxy
+        stdinFilePathField.text = config.stdinFilePath
+        timeoutSecondsSpinner.value = config.timeoutSeconds
+        runInExternalTerminalCheckBox.isSelected = config.runInExternalTerminal
         
         updateUI()
     }
@@ -123,5 +195,18 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
         config.programArguments = programArgsField.text
         config.goToolArguments = goToolArgsField.text
         config.envVariables = envVarsComponent.envs
+
+        // New fields
+        config.enableRace = enableRaceCheckBox.isSelected
+        config.buildTags = buildTagsField.text
+        config.buildMode = buildModeComboBox.item
+        config.goOS = goOsComboBox.item ?: ""
+        config.goArch = goArchComboBox.item ?: ""
+        config.cgoEnabled = cgoEnabledCheckBox.isSelected
+        config.outputPath = outputPathField.text
+        config.goProxy = goProxyField.text
+        config.stdinFilePath = stdinFilePathField.text
+        config.timeoutSeconds = timeoutSecondsSpinner.number
+        config.runInExternalTerminal = runInExternalTerminalCheckBox.isSelected
     }
 }
