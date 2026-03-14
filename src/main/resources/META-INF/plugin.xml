@@ -66,6 +66,9 @@
                 language="Go"
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
 
+        <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
+        <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>
+
         <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
 
         <!-- go.mod / go.work file type -->
