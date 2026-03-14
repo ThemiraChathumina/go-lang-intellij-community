@@ -117,6 +117,12 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
         XmlSerializer.deserializeInto(state, element)
     }
 
+    override fun clone(): RunConfiguration {
+        val cloned = super.clone() as GoRunConfiguration
+        cloned.state = this.state.copy()
+        return cloned
+    }
+
     private class GoRunConfigurationState {
         @Attribute("runKind")
         var runKind: GoRunKind = GoRunKind.FILE
@@ -155,6 +161,28 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
         var runInExternalTerminal: Boolean = false
         @Attribute("timeoutSeconds")
         var timeoutSeconds: Int = 0
+
+        fun copy(): GoRunConfigurationState {
+            val copy = GoRunConfigurationState()
+            copy.runKind = this.runKind
+            copy.targetPath = this.targetPath
+            copy.workingDirectory = this.workingDirectory
+            copy.programArguments = this.programArguments
+            copy.goToolArguments = this.goToolArguments
+            copy.envVariables = HashMap(this.envVariables)
+            copy.enableRace = this.enableRace
+            copy.buildTags = this.buildTags
+            copy.buildMode = this.buildMode
+            copy.goOS = this.goOS
+            copy.goArch = this.goArch
+            copy.cgoEnabled = this.cgoEnabled
+            copy.outputPath = this.outputPath
+            copy.goProxy = this.goProxy
+            copy.stdinFilePath = this.stdinFilePath
+            copy.runInExternalTerminal = this.runInExternalTerminal
+            copy.timeoutSeconds = this.timeoutSeconds
+            return copy
+        }
     }
 
     init {
