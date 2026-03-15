@@ -5,6 +5,7 @@
     <vendor>themirachathumina</vendor>
     <incompatible-with>com.intellij.modules.ultimate</incompatible-with>
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
     <depends>com.redhat.devtools.lsp4ij</depends>
     <depends>com.intellij.modules.vcs</depends>
     <depends>Git4Idea</depends>
@@ -66,10 +67,11 @@
                 language="Go"
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
 
-        <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
-        <beforeRunTaskProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>
+        <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoBuildBeforeRunTaskProvider"/>
+        <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
+        <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>
 
-        <consoleFolding implementation="com.github.themirachathumina.golangintellijcommunity.run.GoConsoleFolding" shouldBeFoldedByDefault="true"/>
+        <console.folding implementation="com.github.themirachathumina.golangintellijcommunity.run.GoConsoleFolding"/>
 
         <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
 

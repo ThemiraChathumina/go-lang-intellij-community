@@ -1,13 +1,13 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.*
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -21,64 +21,14 @@ class GoRunProfileState(
 ) : CommandLineState(env) {
 
     override fun startProcess(): ProcessHandler {
-        val sdkPath = GoProjectSettings.getInstance(environment.project).state.goSdkPath
-        val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
-            ?: throw ExecutionException("Go SDK is not configured for this project.")
+        // Use build result from before-run task if available,
+        // otherwise build now with a modal progress dialog (runs off EDT)
+        val buildResult = environment.getUserData(GO_BUILD_RESULT_KEY)
+            ?: buildWithProgress()
 
-        // 1. Prepare output executable path
-        val outputExe = if (config.outputPath.isNotEmpty()) {
-            config.outputPath
-        } else {
-            FileUtil.createTempFile("go_build_", if (SystemInfo.isWindows) ".exe" else "", true).absolutePath
-        }
+        val outputExe = buildResult.exePath
 
-        // 2. Prepare build command
-        val buildCmd = GeneralCommandLine(goExe, "build", "-o", outputExe)
-        
-        // Apply Go tool arguments
-        if (config.goToolArguments.isNotEmpty()) {
-            buildCmd.parametersList.addParametersString(config.goToolArguments)
-        }
-        
-        // Apply race detector
-        if (config.enableRace) {
-            buildCmd.addParameter("-race")
-        }
-        
-        // Apply build tags
-        if (config.buildTags.isNotEmpty()) {
-            buildCmd.addParameters("-tags", config.buildTags)
-        }
-        
-        // Apply gcflags based on build mode
-        val gcFlags = when (config.buildMode) {
-            GoBuildMode.DEBUG -> "all=-N -l"
-            else -> ""
-        }
-        if (gcFlags.isNotEmpty()) {
-            buildCmd.addParameter("-gcflags=$gcFlags")
-        }
-
-        buildCmd.addParameter(config.targetPath)
-        buildCmd.withWorkDirectory(config.workingDirectory)
-        
-        // Set environment variables for build
-        val envVars = buildCmd.environment
-        envVars.putAll(config.envVariables)
-        if (config.goOS.isNotEmpty()) envVars["GOOS"] = config.goOS
-        if (config.goArch.isNotEmpty()) envVars["GOARCH"] = config.goArch
-        envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
-        if (config.goProxy.isNotEmpty()) envVars["GOPROXY"] = config.goProxy
-        
-        // Forward GOROOT and PATH
-        if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
-            envVars["GOROOT"] = sdkPath
-            val oldPath = System.getenv("PATH") ?: ""
-            val binPath = File(sdkPath, "bin").absolutePath
-            envVars["PATH"] = "$binPath${File.pathSeparator}$oldPath"
-        }
-
-        // 3. Prepare run command
+        // Prepare run command
         val runCmd = if (config.runInExternalTerminal) {
             createExternalTerminalCommandLine(outputExe, config)
         } else {
@@ -88,12 +38,25 @@ class GoRunProfileState(
             }
             cmd
         }
-        
+
         runCmd.withWorkDirectory(config.workingDirectory)
-        
-        // Forward all build environments to the run command as well
-        runCmd.environment.putAll(buildCmd.environment)
-        
+
+        // Forward environment variables to the run command
+        val envVars = runCmd.environment
+        envVars.putAll(config.envVariables)
+        if (config.goOS.isNotEmpty()) envVars["GOOS"] = config.goOS
+        if (config.goArch.isNotEmpty()) envVars["GOARCH"] = config.goArch
+        envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
+        if (config.goProxy.isNotEmpty()) envVars["GOPROXY"] = config.goProxy
+
+        val sdkPath = buildResult.goRoot
+        if (sdkPath.isNotEmpty()) {
+            envVars["GOROOT"] = sdkPath
+            val oldPath = System.getenv("PATH") ?: ""
+            val binPath = File(sdkPath, "bin").absolutePath
+            envVars["PATH"] = "$binPath${File.pathSeparator}$oldPath"
+        }
+
         // Redirect stdin
         if (config.stdinFilePath.isNotEmpty()) {
             val stdinFile = File(config.stdinFilePath)
@@ -102,14 +65,36 @@ class GoRunProfileState(
             }
         }
 
-        // 4. Return the sequential process handler that handles build then run
-        return GoRunProcessHandler(buildCmd, runCmd, config.timeoutSeconds)
+        return GoRunProcessHandler(buildResult, runCmd, config.timeoutSeconds)
+    }
+
+    /**
+     * Fallback: runs the build on a pooled thread with a modal progress dialog.
+     * Used when the GoBuildBeforeRunTask is not present in the configuration.
+     */
+    private fun buildWithProgress(): GoBuildResult {
+        val resultRef = Ref<GoBuildResult>()
+        val errorRef = Ref<Exception>()
+
+        ProgressManager.getInstance().runProcessWithProgressSynchronously(
+            {
+                try {
+                    resultRef.set(buildGoApplication(config))
+                } catch (e: Exception) {
+                    errorRef.set(e)
+                }
+            },
+            "Compiling Go program...",
+            true,
+            environment.project
+        )
+
+        errorRef.get()?.let { throw ExecutionException(it.message, it) }
+        return resultRef.get() ?: throw ExecutionException("Build was cancelled.")
     }
 
     private fun createExternalTerminalCommandLine(exePath: String, config: GoRunConfiguration): GeneralCommandLine {
         return if (SystemInfo.isWindows) {
-            // To avoid complex nested quoting issues with cmd.exe /c and GeneralCommandLine's own escaping,
-            // we create a temporary batch file that launches the application and pauses.
             val tempBat = FileUtil.createTempFile("go_run_", ".bat", true)
             val batContent = """
                 @echo off
@@ -121,7 +106,7 @@ class GoRunProfileState(
                 pause
             """.trimIndent()
             FileUtil.writeToFile(tempBat, batContent)
-            
+
             GeneralCommandLine("cmd.exe", "/c", "start", "/wait", tempBat.absolutePath)
         } else if (SystemInfo.isMac) {
             GeneralCommandLine("open", "-a", "Terminal", exePath)
@@ -132,84 +117,62 @@ class GoRunProfileState(
 }
 
 /**
- * A ProcessHandler that runs a build command followed by a run command.
- * It streams the output of both to the attached console.
+ * A ProcessHandler that displays a foldable setup block, then runs the application.
+ * The build has already completed before this handler is created.
  */
 class GoRunProcessHandler(
-    private val buildCmd: GeneralCommandLine,
+    private val buildResult: GoBuildResult,
     private val runCmd: GeneralCommandLine,
     private val timeoutSeconds: Int
 ) : ProcessHandler() {
 
-    private var activeHandler: ProcessHandler? = null
+    private var runProcessHandler: OSProcessHandler? = null
     private var isDestroyed = false
 
     override fun startNotify() {
         super.startNotify()
-        runBuild()
+
+        if (buildResult.exitCode == 0) {
+            emitSetupBlock(true)
+            runApplication()
+        } else {
+            emitSetupBlock(false)
+            val stderr = buildResult.stderr.trim()
+            if (stderr.isNotEmpty()) {
+                notifyTextAvailable(stderr + "\n", ProcessOutputTypes.STDERR)
+            }
+            val stdout = buildResult.stdout.trim()
+            if (stdout.isNotEmpty()) {
+                notifyTextAvailable(stdout + "\n", ProcessOutputTypes.STDERR)
+            }
+            notifyTextAvailable("Process finished with exit code ${buildResult.exitCode}\n", ProcessOutputTypes.SYSTEM)
+            notifyProcessTerminated(buildResult.exitCode)
+        }
     }
 
-    private fun runBuild() {
-        if (isDestroyed) return
-        
-        notifyTextAvailable("Building Go Application:\n", ProcessOutputTypes.SYSTEM)
-        notifyTextAvailable("  ${buildCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
-        
-        val buildHandler = OSProcessHandler(buildCmd)
-        activeHandler = buildHandler
-        
-        buildHandler.addProcessListener(object : ProcessAdapter() {
-            private var lastLineFinished = true
-            private var firstLineSkipped = false
-            
-            override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                val text = event.text
-                if (text.isEmpty()) return
-                
-                // OSProcessHandler typically sends the command line as the first text event.
-                // We skip it because we already printed it manually (and better formatted).
-                if (!firstLineSkipped && text.endsWith("\n")) {
-                    firstLineSkipped = true
-                    return
-                }
-                
-                // Indent build output to mark it as part of build details
-                val output = if (lastLineFinished) "  " + text else text
-                lastLineFinished = text.endsWith("\n")
-                
-                notifyTextAvailable(output, ProcessOutputTypes.SYSTEM)
-            }
-
-            override fun processTerminated(event: ProcessEvent) {
-                if (event.exitCode == 0) {
-                    runApplication()
-                } else {
-                    notifyTextAvailable("Build finished with exit code ${event.exitCode}\n", ProcessOutputTypes.SYSTEM)
-                    notifyProcessTerminated(event.exitCode)
-                }
-            }
-        })
-        
-        buildHandler.startNotify()
+    private fun emitSetupBlock(buildSucceeded: Boolean) {
+        notifyTextAvailable("  GOROOT=${buildResult.goRoot}\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("  GOPATH=${buildResult.goPath}\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("  ${buildResult.buildCmdString}\n", ProcessOutputTypes.SYSTEM)
+        if (buildSucceeded) {
+            notifyTextAvailable("  ${runCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
+        }
     }
 
     private fun runApplication() {
         if (isDestroyed) return
-        
-        notifyTextAvailable("Running Application:\n", ProcessOutputTypes.SYSTEM)
-        notifyTextAvailable("  ${runCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
-        
-        val runHandler = OSProcessHandler(runCmd)
-        activeHandler = runHandler
-        
-        runHandler.addProcessListener(object : ProcessAdapter() {
+
+        val handler = OSProcessHandler(runCmd)
+        runProcessHandler = handler
+
+        handler.addProcessListener(object : ProcessAdapter() {
             private var firstLineSkipped = false
 
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                 val text = event.text
                 if (text.isEmpty()) return
 
-                // Skip the initial command line output from OSProcessHandler
+                // Skip the initial command line echoed by OSProcessHandler
                 if (!firstLineSkipped && text.endsWith("\n")) {
                     firstLineSkipped = true
                     return
@@ -226,27 +189,27 @@ class GoRunProcessHandler(
 
         if (timeoutSeconds > 0) {
             AppExecutorUtil.getAppScheduledExecutorService().schedule({
-                if (!runHandler.isProcessTerminated) {
+                if (!handler.isProcessTerminated) {
                     notifyTextAvailable("\nProcess timed out after $timeoutSeconds seconds. Killing...\n", ProcessOutputTypes.STDERR)
-                    runHandler.destroyProcess()
+                    handler.destroyProcess()
                 }
             }, timeoutSeconds.toLong(), TimeUnit.SECONDS)
         }
-        
-        runHandler.startNotify()
+
+        handler.startNotify()
     }
 
     override fun destroyProcessImpl() {
         isDestroyed = true
-        activeHandler?.destroyProcess()
+        runProcessHandler?.destroyProcess()
     }
 
     override fun detachProcessImpl() {
         isDestroyed = true
-        activeHandler?.detachProcess()
+        runProcessHandler?.detachProcess()
     }
 
     override fun detachIsDefault(): Boolean = false
 
-    override fun getProcessInput(): OutputStream? = activeHandler?.processInput
+    override fun getProcessInput(): OutputStream? = runProcessHandler?.processInput
 }
