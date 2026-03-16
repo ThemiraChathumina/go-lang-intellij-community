@@ -1,0 +1,30 @@
+<!-- Colors for Go plugin keys (High contrast scheme) -->
+<list>
+    <!-- Built-in types (string, int, bool, error, etc.) on high contrast background -->
+    <option name="GO_BUILTIN_TYPE">
+        <value>
+            <option name="FOREGROUND" value="cc7832"/>
+        </value>
+    </option>
+
+    <!-- Package qualifiers (e.g. fmt, context) on high contrast background -->
+    <option name="GO_PACKAGE_NAME">
+        <value>
+            <option name="FOREGROUND" value="a8cc5c"/>
+        </value>
+    </option>
+
+    <!-- Function calls on high contrast background -->
+    <option name="GO_FUNCTION_CALL">
+        <value>
+            <option name="FOREGROUND" value="edb98e"/>
+        </value>
+    </option>
+
+    <!-- Method calls on high contrast background -->
+    <option name="GO_METHOD_CALL">
+        <value>
+            <option name="FOREGROUND" value="edb98e"/>
+        </value>
+    </option>
+</list>

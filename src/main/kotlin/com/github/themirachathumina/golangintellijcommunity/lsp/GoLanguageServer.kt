@@ -59,6 +59,8 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
 
     // handleMessage is called for ALL messages — both client→server and server→client.
     override fun handleMessage(message: Message, languageServer: LanguageServer?, rootUri: VirtualFile?) {
-        semanticLogger.onMessage(message)
+        if (GoAppSettings.getInstance().state.logSemanticTokens) {
+            semanticLogger.onMessage(message)
+        }
     }
 }

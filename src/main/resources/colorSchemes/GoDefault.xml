@@ -1,0 +1,58 @@
+<!-- Colors for Go plugin keys (IntelliJ Light / Default scheme) -->
+<list>
+    <!-- Built-in types (string, int, bool, error, etc.) on light backgrounds -->
+    <option name="GO_BUILTIN_TYPE">
+        <value>
+            <option name="FOREGROUND" value="0033b3"/>
+        </value>
+    </option>
+
+    <!-- Package qualifiers (e.g. fmt, context) on light backgrounds -->
+    <option name="GO_PACKAGE_NAME">
+        <value>
+            <option name="FOREGROUND" value="805900"/>
+        </value>
+    </option>
+
+    <!-- Interface types: medium blue (light bluish) -->
+    <option name="GO_INTERFACE_TYPE">
+        <value>
+            <option name="FOREGROUND" value="007dc4"/>
+        </value>
+    </option>
+
+    <!-- Function calls on light backgrounds -->
+    <option name="GO_FUNCTION_CALL">
+        <value>
+            <option name="FOREGROUND" value="36666b"/>
+        </value>
+    </option>
+
+    <!-- Method calls on light backgrounds -->
+    <option name="GO_METHOD_CALL">
+        <value>
+            <option name="FOREGROUND" value="36666b"/>
+        </value>
+    </option>
+
+    <!-- Predeclared identifiers (nil, true, false): dark purple -->
+    <option name="GO_PREDECLARED">
+        <value>
+            <option name="FOREGROUND" value="871094"/>
+        </value>
+    </option>
+
+    <!-- Struct types: same medium blue as interface types -->
+    <option name="GO_STRUCT_TYPE">
+        <value>
+            <option name="FOREGROUND" value="007dc4"/>
+        </value>
+    </option>
+
+    <!-- Interface-typed variable: same medium blue as interface types -->
+    <option name="GO_VAR_INTERFACE">
+        <value>
+            <option name="FOREGROUND" value="007dc4"/>
+        </value>
+    </option>
+</list>

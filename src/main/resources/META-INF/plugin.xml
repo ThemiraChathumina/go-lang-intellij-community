@@ -77,6 +77,11 @@
 
         <notificationGroup id="Go Plugin Notifications" displayType="BALLOON"/>
 
+        <additionalTextAttributes scheme="Default" file="colorSchemes/GoDefault.xml"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/GoDarcula.xml"/>
+        <additionalTextAttributes scheme="High contrast" file="colorSchemes/GoHighContrast.xml"/>
+        <additionalTextAttributes scheme="Classic Light" file="colorSchemes/GoClassicLight.xml"/>
+
         <!-- go.mod / go.work file type -->
         <fileType name="Go Module File"
                   implementationClass="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFileType"

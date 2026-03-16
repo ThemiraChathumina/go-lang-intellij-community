@@ -1,0 +1,30 @@
+<!-- Colors for Go plugin keys (Classic Light scheme) -->
+<list>
+    <!-- Built-in types (string, int, bool, error, etc.) on Classic Light background -->
+    <option name="GO_BUILTIN_TYPE">
+        <value>
+            <option name="FOREGROUND" value="000000"/>
+        </value>
+    </option>
+
+    <!-- Package qualifiers (e.g. fmt, context) on Classic Light background -->
+    <option name="GO_PACKAGE_NAME">
+        <value>
+            <option name="FOREGROUND" value="000000"/>
+        </value>
+    </option>
+
+    <!-- Function calls on Classic Light background -->
+    <option name="GO_FUNCTION_CALL">
+        <value>
+            <option name="FOREGROUND" value="000000"/>
+        </value>
+    </option>
+
+    <!-- Method calls on Classic Light background -->
+    <option name="GO_METHOD_CALL">
+        <value>
+            <option name="FOREGROUND" value="000000"/>
+        </value>
+    </option>
+</list>

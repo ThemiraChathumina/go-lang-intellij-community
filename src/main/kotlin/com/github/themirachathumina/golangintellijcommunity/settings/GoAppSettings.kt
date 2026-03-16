@@ -16,6 +16,7 @@ class GoAppSettings : PersistentStateComponent<GoAppSettings.State> {
     class State {
         var lspEnabled: Boolean = true
         var semanticTokensEnabled: Boolean = false
+        var logSemanticTokens: Boolean = false
     }
 
     private var myState = State()

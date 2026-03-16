@@ -1,0 +1,58 @@
+<!-- Default colors for Go plugin semantic token keys (Darcula / dark scheme) -->
+<list>
+    <!-- Built-in types (string, int, bool, error, etc.) on dark/high-contrast backgrounds -->
+    <option name="GO_BUILTIN_TYPE">
+        <value>
+            <option name="FOREGROUND" value="cc7832"/>
+        </value>
+    </option>
+
+    <!-- Package qualifiers (e.g. fmt, context) on dark backgrounds -->
+    <option name="GO_PACKAGE_NAME">
+        <value>
+            <option name="FOREGROUND" value="afbf7e"/>
+        </value>
+    </option>
+
+    <!-- Interface types: light blue (visible on dark background) -->
+    <option name="GO_INTERFACE_TYPE">
+        <value>
+            <option name="FOREGROUND" value="6bafda"/>
+        </value>
+    </option>
+
+    <!-- Function calls on dark backgrounds -->
+    <option name="GO_FUNCTION_CALL">
+        <value>
+            <option name="FOREGROUND" value="b09d79"/>
+        </value>
+    </option>
+
+    <!-- Method calls on dark backgrounds -->
+    <option name="GO_METHOD_CALL">
+        <value>
+            <option name="FOREGROUND" value="b09d79"/>
+        </value>
+    </option>
+
+    <!-- Predeclared identifiers (nil, true, false): soft purple -->
+    <option name="GO_PREDECLARED">
+        <value>
+            <option name="FOREGROUND" value="cc99cd"/>
+        </value>
+    </option>
+
+    <!-- Struct types: same light blue as interface types -->
+    <option name="GO_STRUCT_TYPE">
+        <value>
+            <option name="FOREGROUND" value="6bafda"/>
+        </value>
+    </option>
+
+    <!-- Interface-typed variable: same light blue as interface types -->
+    <option name="GO_VAR_INTERFACE">
+        <value>
+            <option name="FOREGROUND" value="6bafda"/>
+        </value>
+    </option>
+</list>

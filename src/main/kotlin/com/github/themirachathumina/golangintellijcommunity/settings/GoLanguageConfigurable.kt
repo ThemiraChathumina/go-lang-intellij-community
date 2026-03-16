@@ -23,14 +23,21 @@ class GoLanguageConfigurable : BoundConfigurable("Go") {
                     .bindSelected(settings.state::lspEnabled)
                     .comment("Start or stop gopls for this IDE session. Takes effect on Apply.")
             }
+            var semanticCheck: Cell<JCheckBox>? = null
             row {
-                checkBox("Enable semantic tokens")
+                semanticCheck = checkBox("Enable semantic tokens")
                     .bindSelected(settings.state::semanticTokensEnabled)
                     .enabledIf(@Suppress("UNCHECKED_CAST") (lspCheck!! as Cell<AbstractButton>).selected)
                     .comment(
                         "When enabled, gopls provides semantic highlighting (constants, etc.).<br>" +
                         "Takes effect on Apply (restarts the language server)."
                     )
+            }
+            row {
+                checkBox("Log semantic tokens to stdout")
+                    .bindSelected(settings.state::logSemanticTokens)
+                    .enabledIf(@Suppress("UNCHECKED_CAST") (semanticCheck!! as Cell<AbstractButton>).selected)
+                    .comment("Print decoded semantic token output to the Gradle runIde console for debugging.")
             }
         }
     }

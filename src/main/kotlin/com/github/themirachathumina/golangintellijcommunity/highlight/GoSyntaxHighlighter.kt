@@ -27,16 +27,43 @@ class GoSyntaxHighlighter : SyntaxHighlighterBase() {
         // Add these inside your GoSyntaxHighlighter class or companion object
 
         val TYPE_NAME = createTextAttributesKey("GO_TYPE_NAME", DefaultLanguageHighlighterColors.CLASS_NAME)
-        val BUILTIN_TYPE = createTextAttributesKey("GO_BUILTIN_TYPE", DefaultLanguageHighlighterColors.KEYWORD)
+        val BUILTIN_TYPE = createTextAttributesKey("GO_BUILTIN_TYPE", DefaultLanguageHighlighterColors.CLASS_REFERENCE)
         val FUNCTION_DECLARATION = createTextAttributesKey("GO_FUNCTION_DECLARATION", DefaultLanguageHighlighterColors.FUNCTION_DECLARATION)
         val METHOD_DECLARATION = createTextAttributesKey("GO_METHOD_DECLARATION", DefaultLanguageHighlighterColors.INSTANCE_METHOD)
         val FUNCTION_CALL = createTextAttributesKey("GO_FUNCTION_CALL", DefaultLanguageHighlighterColors.FUNCTION_CALL)
-        val METHOD_CALL = createTextAttributesKey("GO_METHOD_CALL", DefaultLanguageHighlighterColors.INSTANCE_METHOD)
+        val METHOD_CALL   = createTextAttributesKey("GO_METHOD_CALL",   DefaultLanguageHighlighterColors.INSTANCE_METHOD)
         val STRUCT_FIELD = createTextAttributesKey("GO_STRUCT_FIELD", DefaultLanguageHighlighterColors.INSTANCE_FIELD)
         val STRUCT_TAG = createTextAttributesKey("GO_STRUCT_TAG", DefaultLanguageHighlighterColors.METADATA)
 
         val VALID_STRING_ESCAPE = createTextAttributesKey("GO_VALID_STRING_ESCAPE", DefaultLanguageHighlighterColors.VALID_STRING_ESCAPE)
         val CONSTANT = createTextAttributesKey("GO_CONSTANT", DefaultLanguageHighlighterColors.STATIC_FIELD)
+
+        // Semantic-token-only keys (only appear when LSP semantic tokens are enabled)
+        val PACKAGE_NAME    = createTextAttributesKey("GO_PACKAGE_NAME",    DefaultLanguageHighlighterColors.CLASS_REFERENCE)
+        val INTERFACE_TYPE  = createTextAttributesKey("GO_INTERFACE_TYPE",  DefaultLanguageHighlighterColors.INTERFACE_NAME)
+        val PARAMETER       = createTextAttributesKey("GO_PARAMETER",       DefaultLanguageHighlighterColors.PARAMETER)
+        val TYPE_PARAMETER  = createTextAttributesKey("GO_TYPE_PARAMETER",  DefaultLanguageHighlighterColors.IDENTIFIER)
+        val NAMESPACE    = createTextAttributesKey("GO_NAMESPACE", DefaultLanguageHighlighterColors.IDENTIFIER)
+
+        // Predeclared identifiers: nil, true, false
+        val PREDECLARED     = createTextAttributesKey("GO_PREDECLARED",     DefaultLanguageHighlighterColors.KEYWORD)
+
+        // Variable type modifier keys
+        val VAR_FUNC        = createTextAttributesKey("GO_VAR_FUNC",        DefaultLanguageHighlighterColors.IDENTIFIER)
+        val VAR_INTERFACE   = createTextAttributesKey("GO_VAR_INTERFACE",   DefaultLanguageHighlighterColors.INTERFACE_NAME)
+        val VAR_POINTER     = createTextAttributesKey("GO_VAR_POINTER",     DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
+        val VAR_STRING      = createTextAttributesKey("GO_VAR_STRING",      DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
+        val VAR_NUMBER      = createTextAttributesKey("GO_VAR_NUMBER",      DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
+
+        // Parameter type modifier keys
+        val PARAM_INTERFACE = createTextAttributesKey("GO_PARAM_INTERFACE", DefaultLanguageHighlighterColors.PARAMETER)
+        val PARAM_STRUCT    = createTextAttributesKey("GO_PARAM_STRUCT",    DefaultLanguageHighlighterColors.PARAMETER)
+
+        // Type with struct modifier — same visual default as interface type
+        val STRUCT_TYPE     = createTextAttributesKey("GO_STRUCT_TYPE",     DefaultLanguageHighlighterColors.INTERFACE_NAME)
+
+        // Format verbs inside strings (%s, %d, etc.)
+        val FORMAT_VERB     = createTextAttributesKey("GO_FORMAT_VERB",     DefaultLanguageHighlighterColors.VALID_STRING_ESCAPE)
 
         private val KEYWORD_KEYS = arrayOf(KEYWORD)
         private val NUMBER_KEYS = arrayOf(NUMBER)
