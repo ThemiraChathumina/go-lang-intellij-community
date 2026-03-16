@@ -32,15 +32,42 @@ val GO_BUILD_RESULT_KEY: Key<GoBuildResult> = Key.create("GoBuildResult")
  * Builds a Go application from the given run configuration.
  * Can be called from any thread except EDT.
  */
+/**
+ * Derives the binary name that `go build` produces when given a directory as -o target.
+ * For FILE kind: uses the parent directory name of the target .go file.
+ * For PACKAGE kind: uses the last segment of the target directory.
+ */
+private fun deriveBinaryName(config: GoRunConfiguration): String {
+    val base = when (config.runKind) {
+        GoRunKind.FILE -> {
+            val targetFile = File(FileUtil.toSystemDependentName(config.targetPath))
+            targetFile.parentFile?.name ?: "main"
+        }
+        GoRunKind.PACKAGE -> {
+            File(FileUtil.toSystemDependentName(config.targetPath)).name
+        }
+    }
+    return if (SystemInfo.isWindows) "$base.exe" else base
+}
+
 fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
     val sdkPath = GoProjectSettings.getInstance(config.project).state.goSdkPath
     val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
         ?: throw ExecutionException("Go SDK is not configured for this project.")
 
-    val outputExe = if (config.outputPath.isNotEmpty()) {
+    val rawOutputPath = if (config.outputPath.isNotEmpty()) {
         FileUtil.toSystemDependentName(config.outputPath)
     } else {
         FileUtil.createTempFile("go_build_", if (SystemInfo.isWindows) ".exe" else "", true).absolutePath
+    }
+
+    // If output path is a directory (existing or trailing separator), resolve the binary inside it
+    val outputDir = File(rawOutputPath)
+    val outputExe = if (outputDir.isDirectory || rawOutputPath.endsWith(File.separator) || rawOutputPath.endsWith("/")) {
+        outputDir.mkdirs()
+        File(outputDir, deriveBinaryName(config)).absolutePath
+    } else {
+        rawOutputPath
     }
 
     val buildCmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "build", "-o", outputExe)

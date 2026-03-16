@@ -122,6 +122,13 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
     override fun clone(): RunConfiguration {
         val cloned = super.clone() as GoRunConfiguration
         cloned.state = this.state.copy()
+
+        // Template may have been created before SDK cache was populated;
+        // re-check on every clone so new configs always get the latest values.
+        val registry = GoGlobalSdkRegistry.getInstance()
+        if (cloned.goOS.isEmpty()) cloned.goOS = registry.state.cachedGoOS
+        if (cloned.goArch.isEmpty()) cloned.goArch = registry.state.cachedGoArch
+        if (cloned.goProxy.isEmpty()) cloned.goProxy = registry.state.cachedGoProxy
         return cloned
     }
 
