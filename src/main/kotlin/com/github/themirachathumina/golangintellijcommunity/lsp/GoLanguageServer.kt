@@ -6,6 +6,7 @@ import com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettin
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
 import com.intellij.openapi.vfs.VirtualFile
 import org.eclipse.lsp4j.jsonrpc.messages.Message
@@ -24,23 +25,24 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
         val goplsExe = GoSdkUtils.getGoplsExecutablePath(if (sdkPath.isNotEmpty()) sdkPath else null) ?: "gopls"
         LOG.info("[Go-Lang-Community] Using gopls executable: $goplsExe")
 
-        val commandLine = GeneralCommandLine(goplsExe, "serve")
+        val commandLine = GeneralCommandLine(FileUtil.toSystemDependentName(goplsExe), "serve")
 
         if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
-            commandLine.withEnvironment("GOROOT", sdkPath)
+            val sysDepSdkPath = FileUtil.toSystemDependentName(sdkPath)
+            commandLine.withEnvironment("GOROOT", sysDepSdkPath)
             val oldPath = System.getenv("PATH") ?: ""
-            val binPath = File(sdkPath, "bin").absolutePath
+            val binPath = File(sysDepSdkPath, "bin").absolutePath
             commandLine.withEnvironment("PATH", "$binPath${File.pathSeparator}$oldPath")
         }
 
-        val effectiveGoPath = GoSdkUtils.resolveGoPath().joinToString(File.pathSeparator)
+        val effectiveGoPath = GoSdkUtils.resolveGoPath().map { FileUtil.toSystemDependentName(it) }.joinToString(File.pathSeparator)
         val systemGoPath = System.getenv("GOPATH") ?: ""
         if (effectiveGoPath != systemGoPath) {
             commandLine.withEnvironment("GOPATH", effectiveGoPath)
             LOG.info("[Go-Lang-Community] Setting GOPATH for gopls: $effectiveGoPath")
         }
 
-        val effectiveGoModCache = GoSdkUtils.resolveGoModCache()
+        val effectiveGoModCache = FileUtil.toSystemDependentName(GoSdkUtils.resolveGoModCache())
         val systemGoModCache = System.getenv("GOMODCACHE") ?: ""
         if (effectiveGoModCache != systemGoModCache) {
             commandLine.withEnvironment("GOMODCACHE", effectiveGoModCache)

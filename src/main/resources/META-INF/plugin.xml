@@ -12,6 +12,7 @@
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
+
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
                 serviceImplementation="com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings"/>
@@ -67,7 +68,8 @@
                 language="Go"
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
 
-        <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoBuildBeforeRunTaskProvider"/>
+        <programRunner implementation="com.github.themirachathumina.golangintellijcommunity.run.GoProgramRunner"/>
+
         <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
         <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>
 

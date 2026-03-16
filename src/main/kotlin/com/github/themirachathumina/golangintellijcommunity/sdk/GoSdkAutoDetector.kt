@@ -12,6 +12,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import com.intellij.openapi.util.io.FileUtil
 import com.redhat.devtools.lsp4ij.LanguageServerManager
 import java.io.File
 
@@ -26,6 +27,7 @@ class GoSdkAutoDetector : ProjectActivity {
 
         val settings = GoProjectSettings.getInstance(project)
         if (settings.state.goSdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(settings.state.goSdkPath)) {
+            GoGlobalSdkRegistry.getInstance().refreshEnvCache(settings.state.goSdkPath)
             checkAndStartLanguageServer(project, settings.state.goSdkPath)
             return
         }
@@ -137,10 +139,10 @@ class GoSdkAutoDetector : ProjectActivity {
     private fun runGoEnvGoroot(systemGoPath: String, workDir: File): String? {
         val goExe = GoSdkUtils.getGoExecutablePath(systemGoPath) ?: return null
         return try {
-            val cmd = GeneralCommandLine(goExe, "env", "GOROOT").withWorkDirectory(workDir)
+            val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "env", "GOROOT").withWorkDirectory(workDir)
             val handler = CapturingProcessHandler(cmd)
             val output = handler.runProcess(30000)
-            if (output.exitCode == 0) output.stdout.trim() else null
+            if (output.exitCode == 0) FileUtil.toSystemIndependentName(output.stdout.trim()) else null
         } catch (e: Exception) {
             null
         }
@@ -223,8 +225,8 @@ class GoSdkAutoDetector : ProjectActivity {
                 }
 
                 try {
-                    val cmd = GeneralCommandLine(goExe, "install", "golang.org/x/tools/gopls@latest")
-                        .withEnvironment("GOROOT", sdkHome)
+                    val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "install", "golang.org/x/tools/gopls@latest")
+                        .withEnvironment("GOROOT", FileUtil.toSystemDependentName(sdkHome))
                     val handler = CapturingProcessHandler(cmd)
                     val output = handler.runProcess(120 * 1000)
 

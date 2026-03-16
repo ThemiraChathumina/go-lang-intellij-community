@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistry
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.execution.Executor
@@ -7,6 +8,7 @@ import com.intellij.execution.configurations.*
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.xmlb.XmlSerializer
 import com.intellij.util.xmlb.annotations.Attribute
 import com.intellij.util.xmlb.annotations.Tag
@@ -26,11 +28,11 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
 
     var targetPath: String
         get() = state.targetPath
-        set(value) { state.targetPath = value }
+        set(value) { state.targetPath = FileUtil.toSystemIndependentName(value) }
 
     var workingDirectory: String
         get() = state.workingDirectory
-        set(value) { state.workingDirectory = value }
+        set(value) { state.workingDirectory = FileUtil.toSystemIndependentName(value) }
 
     var programArguments: String
         get() = state.programArguments
@@ -70,7 +72,7 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
 
     var outputPath: String
         get() = state.outputPath
-        set(value) { state.outputPath = value }
+        set(value) { state.outputPath = FileUtil.toSystemIndependentName(value) }
 
     var goProxy: String
         get() = state.goProxy
@@ -78,7 +80,7 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
 
     var stdinFilePath: String
         get() = state.stdinFilePath
-        set(value) { state.stdinFilePath = value }
+        set(value) { state.stdinFilePath = FileUtil.toSystemIndependentName(value) }
 
     var runInExternalTerminal: Boolean
         get() = state.runInExternalTerminal
@@ -187,5 +189,17 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
 
     init {
         workingDirectory = project.basePath ?: ""
+
+        // Pre-fill from globally cached Go env (populated during SDK detection)
+        val registry = GoGlobalSdkRegistry.getInstance()
+        if (registry.state.cachedGoOS.isEmpty()) {
+            val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
+            if (sdkPath.isNotEmpty()) {
+                registry.refreshEnvCache(sdkPath)
+            }
+        }
+        if (goOS.isEmpty()) goOS = registry.state.cachedGoOS
+        if (goArch.isEmpty()) goArch = registry.state.cachedGoArch
+        if (goProxy.isEmpty()) goProxy = registry.state.cachedGoProxy
     }
 }

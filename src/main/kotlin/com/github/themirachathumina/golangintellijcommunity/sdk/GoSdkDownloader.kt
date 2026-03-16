@@ -5,6 +5,7 @@ import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.io.Decompressor
 import com.intellij.util.io.HttpRequests
 import java.io.File
@@ -61,7 +62,8 @@ object GoSdkDownloader {
 
             if (destDir.exists()) {
                 val innerGo = File(destDir, "go")
-                return if (innerGo.exists()) innerGo.absolutePath else destDir.absolutePath
+                val existing = if (innerGo.exists()) innerGo.absolutePath else destDir.absolutePath
+                return FileUtil.toSystemIndependentName(existing)
             }
 
             indicator.text = "Downloading $version..."
@@ -84,7 +86,7 @@ object GoSdkDownloader {
                 extractDir.renameTo(destDir)
             }
 
-            val finalPath = destDir.absolutePath
+            val finalPath = FileUtil.toSystemIndependentName(destDir.absolutePath)
             GoGlobalSdkRegistry.getInstance().addSdkPath(finalPath)
             return finalPath
         } catch (e: Exception) {

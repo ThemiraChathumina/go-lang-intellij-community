@@ -2,6 +2,7 @@ package com.github.themirachathumina.golangintellijcommunity.sdk
 
 import com.intellij.openapi.components.*
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.messages.Topic
 
 interface GoProjectSettingsListener {
@@ -27,9 +28,10 @@ class GoProjectSettings(val project: Project) : PersistentStateComponent<GoProje
     }
 
     fun setSdkPath(path: String) {
-        if (myState.goSdkPath != path) {
-            myState.goSdkPath = path
-            project.messageBus.syncPublisher(TOPIC).sdkChanged(path)
+        val normalized = FileUtil.toSystemIndependentName(path)
+        if (myState.goSdkPath != normalized) {
+            myState.goSdkPath = normalized
+            project.messageBus.syncPublisher(TOPIC).sdkChanged(normalized)
         }
     }
 

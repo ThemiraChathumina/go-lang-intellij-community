@@ -38,12 +38,12 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
         ?: throw ExecutionException("Go SDK is not configured for this project.")
 
     val outputExe = if (config.outputPath.isNotEmpty()) {
-        config.outputPath
+        FileUtil.toSystemDependentName(config.outputPath)
     } else {
         FileUtil.createTempFile("go_build_", if (SystemInfo.isWindows) ".exe" else "", true).absolutePath
     }
 
-    val buildCmd = GeneralCommandLine(goExe, "build", "-o", outputExe)
+    val buildCmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "build", "-o", outputExe)
 
     if (config.goToolArguments.isNotEmpty()) {
         buildCmd.parametersList.addParametersString(config.goToolArguments)
@@ -62,8 +62,8 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
         buildCmd.addParameter("-gcflags=$gcFlags")
     }
 
-    buildCmd.addParameter(config.targetPath)
-    buildCmd.withWorkDirectory(config.workingDirectory)
+    buildCmd.addParameter(FileUtil.toSystemDependentName(config.targetPath))
+    buildCmd.withWorkDirectory(FileUtil.toSystemDependentName(config.workingDirectory))
 
     val envVars = buildCmd.environment
     envVars.putAll(config.envVariables)
@@ -72,10 +72,11 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
     envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
     if (config.goProxy.isNotEmpty()) envVars["GOPROXY"] = config.goProxy
 
+    val sysDepSdkPath = FileUtil.toSystemDependentName(sdkPath)
     if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
-        envVars["GOROOT"] = sdkPath
+        envVars["GOROOT"] = sysDepSdkPath
         val oldPath = System.getenv("PATH") ?: ""
-        val binPath = File(sdkPath, "bin").absolutePath
+        val binPath = File(sysDepSdkPath, "bin").absolutePath
         envVars["PATH"] = "$binPath${File.pathSeparator}$oldPath"
     }
 
@@ -90,7 +91,7 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
         stderr = result.stderr,
         exePath = outputExe,
         buildCmdString = buildCmd.commandLineString,
-        goRoot = sdkPath,
+        goRoot = sysDepSdkPath,
         goPath = goPath
     )
 }

@@ -18,22 +18,24 @@ object GoSdkUtils {
     private val pendingVersions = mutableSetOf<String>()
 
     fun getGoExecutablePath(sdkHomePath: String): String? {
-        val binDir = File(sdkHomePath, "bin")
+        val normalized = FileUtil.toSystemDependentName(sdkHomePath)
+        val binDir = File(normalized, "bin")
         val goExe = File(binDir, GO_EXECUTABLE_NAME)
         val exists = goExe.exists() && goExe.canExecute()
         if (!exists) {
             LOG.debug("[Go-Lang-Community] Go executable not found or not executable at: ${goExe.absolutePath}")
         }
-        return if (exists) goExe.absolutePath else null
+        return if (exists) FileUtil.toSystemIndependentName(goExe.absolutePath) else null
     }
 
     fun getGoplsExecutablePath(sdkHomePath: String?): String? {
         if (sdkHomePath != null) {
-            val binDir = File(sdkHomePath, "bin")
+            val normalized = FileUtil.toSystemDependentName(sdkHomePath)
+            val binDir = File(normalized, "bin")
             val goplsExe = File(binDir, GOPLS_EXECUTABLE_NAME)
             if (goplsExe.exists() && goplsExe.canExecute()) {
                 LOG.debug("Found gopls in SDK bin: ${goplsExe.absolutePath}")
-                return goplsExe.absolutePath
+                return FileUtil.toSystemIndependentName(goplsExe.absolutePath)
             }
         }
 
@@ -49,7 +51,7 @@ object GoSdkUtils {
             val gopathBin = File(File(gopathEntry, "bin"), GOPLS_EXECUTABLE_NAME)
             if (gopathBin.exists() && gopathBin.canExecute()) {
                 LOG.debug("Found gopls in GOPATH bin: ${gopathBin.absolutePath}")
-                return gopathBin.absolutePath
+                return FileUtil.toSystemIndependentName(gopathBin.absolutePath)
             }
         }
 
@@ -61,7 +63,7 @@ object GoSdkUtils {
         val path = getGoplsExecutablePath(sdkHomePath)
 
         // If it found a concrete file path that exists, we are good!
-        if (path != GOPLS_EXECUTABLE_NAME && File(path ?: "").exists()) return true
+        if (path != GOPLS_EXECUTABLE_NAME && File(FileUtil.toSystemDependentName(path ?: "")).exists()) return true
 
         // Fallback: If it just returned "gopls", try executing it to see if it's in the system PATH
         return try {
@@ -80,7 +82,7 @@ object GoSdkUtils {
     }
 
     private fun readVersionFile(sdkHomePath: String): String? {
-        val versionFile = File(sdkHomePath, "VERSION")
+        val versionFile = File(FileUtil.toSystemDependentName(sdkHomePath), "VERSION")
         if (!versionFile.exists()) return null
         return try {
             // Format: "go1.22.3" or "go1.22.3 cl/123456" or "devel ..." for tip builds
@@ -133,8 +135,9 @@ object GoSdkUtils {
 
     private fun doRetrieveGoVersion(normalizedPath: String, exePath: String): String? {
         try {
-            LOG.debug("Running '$exePath version' to retrieve Go version...")
-            val commandLine = GeneralCommandLine(exePath, "version")
+            val sysDepExe = FileUtil.toSystemDependentName(exePath)
+            LOG.debug("Running '$sysDepExe version' to retrieve Go version...")
+            val commandLine = GeneralCommandLine(sysDepExe, "version")
             val handler = CapturingProcessHandler(commandLine)
             val output = handler.runProcess(5000)
 
@@ -291,7 +294,7 @@ object GoSdkUtils {
             if (isValidSdkHome(snapPath)) suggestions.add(snapPath)
         }
 
-        val result = suggestions.distinct()
+        val result = suggestions.map { FileUtil.toSystemIndependentName(it) }.distinct()
         LOG.info("Suggested SDK paths: $result")
         return result
     }
@@ -355,7 +358,7 @@ object GoSdkUtils {
     fun fetchGoEnv(sdkHomePath: String, vararg vars: String): Map<String, String> {
         val exePath = getGoExecutablePath(sdkHomePath) ?: return emptyMap()
         try {
-            val commandLine = GeneralCommandLine(exePath, "env").apply {
+            val commandLine = GeneralCommandLine(FileUtil.toSystemDependentName(exePath), "env").apply {
                 addParameters(*vars)
             }
             val handler = CapturingProcessHandler(commandLine)
@@ -377,9 +380,9 @@ object GoSdkUtils {
     fun resolveGoPath(): List<String> {
         val goEnv = readGoEnvFile()
         return buildList {
-            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(it) }
-            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(it) }
-            add(File(System.getProperty("user.home"), "go").absolutePath)
+            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
+            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
+            add(FileUtil.toSystemIndependentName(File(System.getProperty("user.home"), "go").absolutePath))
         }.distinct()
     }
 
@@ -389,8 +392,8 @@ object GoSdkUtils {
      */
     fun resolveGoModCache(): String {
         val goEnv = readGoEnvFile()
-        goEnv["GOMODCACHE"]?.let { return it }
-        System.getenv("GOMODCACHE")?.let { return it }
-        return File(resolveGoPath().first(), "pkg/mod").absolutePath
+        goEnv["GOMODCACHE"]?.let { return FileUtil.toSystemIndependentName(it) }
+        System.getenv("GOMODCACHE")?.let { return FileUtil.toSystemIndependentName(it) }
+        return FileUtil.toSystemIndependentName(File(resolveGoPath().first(), "pkg/mod").absolutePath)
     }
 }

@@ -15,6 +15,8 @@ import java.io.File
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 
+private fun toNative(path: String): String = FileUtil.toSystemDependentName(path)
+
 class GoRunProfileState(
     env: ExecutionEnvironment,
     private val config: GoRunConfiguration
@@ -39,7 +41,7 @@ class GoRunProfileState(
             cmd
         }
 
-        runCmd.withWorkDirectory(config.workingDirectory)
+        runCmd.withWorkDirectory(toNative(config.workingDirectory))
 
         // Forward environment variables to the run command
         val envVars = runCmd.environment
@@ -59,7 +61,7 @@ class GoRunProfileState(
 
         // Redirect stdin
         if (config.stdinFilePath.isNotEmpty()) {
-            val stdinFile = File(config.stdinFilePath)
+            val stdinFile = File(toNative(config.stdinFilePath))
             if (stdinFile.exists()) {
                 runCmd.withInput(stdinFile)
             }
