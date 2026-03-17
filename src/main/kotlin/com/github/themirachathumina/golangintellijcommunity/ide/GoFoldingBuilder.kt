@@ -2,6 +2,7 @@ package com.github.themirachathumina.golangintellijcommunity.ide
 
 import com.github.themirachathumina.golangintellijcommunity.psi.GoBlock
 import com.github.themirachathumina.golangintellijcommunity.psi.GoImportDecl
+import com.github.themirachathumina.golangintellijcommunity.psi.GoInterfaceType
 import com.github.themirachathumina.golangintellijcommunity.psi.GoStructType
 import com.intellij.lang.ASTNode
 import com.intellij.lang.folding.FoldingBuilderEx
@@ -39,6 +40,11 @@ class GoFoldingBuilder : FoldingBuilderEx(), DumbAware {
             descriptors.add(FoldingDescriptor(struct.node, struct.textRange))
         }
 
+        // 4. Interfaces interface { ... }
+        PsiTreeUtil.findChildrenOfType(root, GoInterfaceType::class.java).forEach { iface ->
+            descriptors.add(FoldingDescriptor(iface.node, iface.textRange))
+        }
+
         return descriptors.toTypedArray()
     }
 
@@ -47,6 +53,7 @@ class GoFoldingBuilder : FoldingBuilderEx(), DumbAware {
             is GoBlock -> "{...}"
             is GoImportDecl -> "(...)"
             is GoStructType -> "{...}"
+            is GoInterfaceType -> "{...}"
             else -> "..."
         }
     }
