@@ -52,6 +52,7 @@
 
         <newProjectWizard.generator implementation="com.github.themirachathumina.golangintellijcommunity.wizard.GoNewProjectWizard"/>
         <configurationType implementation="com.github.themirachathumina.golangintellijcommunity.run.GoRunConfigurationType"/>
+        <configurationType implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfigurationType"/>
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo
                 language="Go"
@@ -64,11 +65,15 @@
 
         <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoFileRunConfigurationProducer"/>
         <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoPackageRunConfigurationProducer"/>
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfigurationProducer"/>
         <runLineMarkerContributor
                 language="Go"
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>
+        <runLineMarkerContributor
+                language="Go"
+                implementationClass="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunLineMarkerContributor"/>
 
-        <programRunner implementation="com.github.themirachathumina.golangintellijcommunity.run.GoProgramRunner"/>
+        <testFinder implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestFinder"/>
 
         <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoGenerateBeforeRunTaskProvider"/>
         <stepsBeforeRunProvider implementation="com.github.themirachathumina.golangintellijcommunity.run.GoModTidyBeforeRunTaskProvider"/>

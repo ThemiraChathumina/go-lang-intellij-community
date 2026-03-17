@@ -11,13 +11,17 @@ This is an IntelliJ Platform plugin that provides Go language support for Intell
 The plugin is structured around two main pillars:
 
 1. **Custom Parser & Editor Features** — Lexer-based syntax highlighting, annotators, and editor helpers implemented directly using the IntelliJ Platform APIs.
-2. **LSP Bridge (gopls)** — Delegates advanced language intelligence (diagnostics, navigation, hints) to the Go Language Server via the `lsp4intellij` or similar LSP client bridge.
+2. **LSP Bridge (gopls)** — Delegates advanced language intelligence (diagnostics, navigation, hints) to the Go Language Server via the `lsp4ij` LSP client bridge.
 
 Key packages:
 - `lsp/` — LSP client setup and gopls integration (`GoLanguageServer`, `GoLanguageServerFactory`)
 - `sdk/` — SDK detection, project settings, status bar widget, and lifecycle management
 - `run/` — Run configuration and profile state
 - `wizard/` — New project wizard step
+- `ide/` — Editor features (folding, brace matching, commenting, annotators, etc.)
+- `gomod/` — go.mod / go.work / go.sum file type support
+- `file/` — File creation templates and actions
+- `settings/` — Application and project settings
 
 ## Important Constraints
 
@@ -27,26 +31,97 @@ Key packages:
 
 ## Implemented Features
 
-### Core Language & Editor Support
-- Syntax highlighting via custom lexer
-- Annotators: semantic highlighting, format verbs (`%v`, `%d`), escape sequences, regexp injection
-- Code folding, brace matching, smart quotes, line/block commenting, spellcheck integration
+### Core Language & File Types
+- Go language definition and `.go` file type registration with icon
+- GoMod language for `go.mod`, `go.work`, `go.sum` files with custom icons
+- PSI file base class, lexer/parser adapter, and element factory (auto-generated from Grammar-Kit)
 
-### SDK & Project Management
-- Auto-detection of installed Go versions
-- SDK status bar widget
-- New project wizard
-- SDK misconfiguration notifications
+### Syntax Highlighting
+- Lexer-based syntax highlighter mapping 50+ token types to color attributes
+- Color settings page with customizable preview and demo code
+- Theme-specific color schemes: Default, Darcula, High Contrast, Classic Light
+- go.mod syntax highlighter (keywords, module paths, versions, comments)
 
-### Run/Debug
-- Run configurations and producers
-- Line markers (gutter icons) for `main` functions and tests
+### Semantic Highlighting (LSP)
+- gopls semantic tokens mapped to IDE `TextAttributesKey`
+- Distinct colors for: namespace, variable, function, type, property, parameter, typeParameter, string
+- Modifiers: readonly, defaultLibrary, interface, pointer, struct, string, number, definition, signature
+- Special highlighting for predeclared identifiers (`nil`, `true`, `false`)
+- PSI annotator for struct tag keys in backtick strings
+
+### Annotators
+- **Format verb annotator** — highlights `%s`, `%d`, `%+v`, `%.2f`, `%05d`, `%%`, etc. in string literals
+- **Escape sequence annotator** — highlights valid Go escape sequences (`\n`, `\t`, `\uXXXX`, `\xhh`, etc.)
+- **Error highlighting filter** — suppresses `PsiErrorElement` noise in Go files
+
+### Language Injection
+- Injects RegExp language into string literals used with `regexp.Compile`/`MustCompile`/`Match`
+- Injects RegExp into assignments to common regex variable names (`pattern`, `regex`, `re`, etc.)
+- Heuristic injection into raw strings containing regex metacharacters
+
+### Editor Features
+- **Code folding** — blocks `{}`, import groups `(...)`, structs, and interfaces
+- **Line/block commenting** — `//` and `/* */` toggle; go.mod commenting support
+- **Brace matcher** — paired matching for `{}`, `[]`, `()`
+- **Smart quote handler** — handles `"`, `` ` ``, `'` (rune literals)
+- **Spellcheck** — enabled in comments and string literals
+- **Line markers** — green Run gutter icon on `func main()` in `main` packages
+
+### SDK Management
+- Auto-detection of installed Go SDKs on project open and IDE start
+- Multi-version discovery with `.go-version`, `go.work`, `go.mod`, `GOTOOLCHAIN` support
+- Application-level SDK global registry with version caching
+- SDK validation (checks for valid Go executable in SDK home)
+- Status bar widget showing current Go version with dropdown to switch SDKs
+- Status bar actions: Add Local SDK, Download SDK, switch between registered SDKs
+- Editor notification banner when Go SDK is not configured for a `.go` file
+- SDK download support (fetches available versions and downloads selected)
+- Environment caching: `GOOS`, `GOARCH`, `GOPROXY` from selected SDK
+- Reads `~/.config/go/env` and system env for `GOPATH`, `GOMODCACHE`, `GOTOOLCHAIN`
+- Automatically starts/stops gopls when SDK changes
 
 ### LSP Integration (gopls)
+- Language server factory spawning `gopls serve` with proper `GOROOT`, `GOPATH`, `GOMODCACHE`, `PATH`
+- LSP client with initialization options for semantic tokens
+- LSP mappings for Go, GoMod, go.work, and go.sum files
 - Parameter info / signature hints
-- Structure view
+- Structure view (document symbols)
 - Real-time error diagnostics
-- Code navigation (go to definition, find usages)
+- Code navigation (go to definition, find usages, hover)
+- Selection range disabled for go.mod/go.work files
+- Optional debug logging of semantic token messages
+
+### Run Configuration
+- Run configuration type, factory, and settings editor UI
+- Target path, working directory, program arguments, environment variables
+- Build modes: DEFAULT, DEBUG, RELEASE
+- Cross-compilation: `GOOS`, `GOARCH` configuration
+- Advanced options: race detector, build tags, `CGO_ENABLED`, `GOPROXY`, stdin file, external terminal, timeout
+- Run producers for files (`main.go`) and packages containing `func main()`
+- Program runner with automatic `go build` before execution and build error capture
+- Pre-run task providers: `go generate ./...` and `go mod tidy`
+- Console output folding for indented setup lines
+
+### Go Modules Support
+- go.mod file type with parser, lexer, and syntax highlighter
+- Folding for `require(...)` and `exclude(...)` blocks
+- Line and block commenting in go.mod files
+- go.sum editor notification advising against manual edits
+- Module file reconciliation after SDK changes
+
+### Project Wizard
+- "Go" option in New Project dialog
+- Wizard steps with Git integration and Go-specific SDK path configuration
+
+### File Creation
+- New Go file action with templates: Simple file, Main file, Test file
+- Auto-generates valid package name from directory name
+
+### Settings
+- Application-level settings: LSP enablement, semantic tokens toggle, gopls options
+- Project-level settings: Go SDK path selection
+- XML-serialized persistence for both scopes
+- Message bus notifications and UI listeners on settings change
 
 ## Development Workflow
 
@@ -59,6 +134,13 @@ Key packages:
 Do not leave compilation errors unfixed. If errors are introduced by a change, resolve them immediately in the same task.
 
 **After every successful change, provide a short one-line commit message** summarising what was done.
+
+## Researching Library APIs
+
+When you need to explore APIs from a dependency (e.g. lsp4ij, IntelliJ Platform), **search the library's GitHub source repository** — do not decompile local jars. Use the WebSearch or WebFetch tools against the relevant GitHub repo.
+
+- lsp4ij: https://github.com/redhat-developer/lsp4ij
+- IntelliJ Platform SDK: https://github.com/JetBrains/intellij-community
 
 ## Build & Development
 
