@@ -15,31 +15,55 @@ class GoLanguageConfigurable : BoundConfigurable("Go") {
 
     private val settings = GoAppSettings.getInstance()
 
-    override fun createPanel(): DialogPanel = panel {
-        group("Language Server (gopls)") {
-            var lspCheck: Cell<JCheckBox>? = null
-            row {
-                lspCheck = checkBox("Enable Go language server (gopls)")
-                    .bindSelected(settings.state::lspEnabled)
-                    .comment("Start or stop gopls for this IDE session. Takes effect on Apply.")
-            }
-            var semanticCheck: Cell<JCheckBox>? = null
-            row {
-                semanticCheck = checkBox("Enable semantic tokens")
-                    .bindSelected(settings.state::semanticTokensEnabled)
-                    .enabledIf(@Suppress("UNCHECKED_CAST") (lspCheck!! as Cell<AbstractButton>).selected)
-                    .comment(
-                        "When enabled, gopls provides semantic highlighting (constants, etc.).<br>" +
-                        "Takes effect on Apply (restarts the language server)."
-                    )
-            }
-            row {
-                checkBox("Log semantic tokens to stdout")
-                    .bindSelected(settings.state::logSemanticTokens)
-                    .enabledIf(@Suppress("UNCHECKED_CAST") (semanticCheck!! as Cell<AbstractButton>).selected)
-                    .comment("Print decoded semantic token output to the Gradle runIde console for debugging.")
+    override fun createPanel(): DialogPanel {
+        var lspCheck: Cell<JCheckBox>? = null
+        var semanticCheck: Cell<JCheckBox>? = null
+        var logCheck: Cell<JCheckBox>? = null
+
+        val dialogPanel = panel {
+            group("Language Server (gopls)") {
+                row {
+                    lspCheck = checkBox("Enable Go language server (gopls)")
+                        .bindSelected(settings.state::lspEnabled)
+                        .comment("Start or stop gopls for this IDE session. Takes effect on Apply.")
+                }
+                row {
+                    semanticCheck = checkBox("Enable semantic tokens")
+                        .bindSelected(settings.state::semanticTokensEnabled)
+                        .enabledIf(@Suppress("UNCHECKED_CAST") (lspCheck!! as Cell<AbstractButton>).selected)
+                        .comment(
+                            "When enabled, gopls provides semantic highlighting (constants, etc.).<br>" +
+                            "Takes effect on Apply (restarts the language server)."
+                        )
+                }
+                row {
+                    logCheck = checkBox("Log semantic tokens to stdout")
+                        .bindSelected(settings.state::logSemanticTokens)
+                        .enabledIf(@Suppress("UNCHECKED_CAST") (semanticCheck!! as Cell<AbstractButton>).selected)
+                        .comment("Print decoded semantic token output to the Gradle runIde console for debugging.")
+                }
             }
         }
+
+        val lspC      = lspCheck!!
+        val semanticC = semanticCheck!!
+        val logC      = logCheck!!
+
+        // When gopls is unchecked, force-uncheck both dependent checkboxes.
+        lspC.component.addActionListener {
+            if (!lspC.component.isSelected) {
+                semanticC.component.isSelected = false
+                logC.component.isSelected = false
+            }
+        }
+        // When semantic tokens is unchecked, force-uncheck the log checkbox.
+        semanticC.component.addActionListener {
+            if (!semanticC.component.isSelected) {
+                logC.component.isSelected = false
+            }
+        }
+
+        return dialogPanel
     }
 
     override fun apply() {
