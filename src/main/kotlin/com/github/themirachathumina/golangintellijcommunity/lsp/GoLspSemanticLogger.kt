@@ -48,7 +48,7 @@ class GoLspSemanticLogger {
                 val td   = obj.getAsJsonObject("params")?.getAsJsonObject("textDocument") ?: return
                 val uri  = td.get("uri")?.asString  ?: return
                 val text = td.get("text")?.asString ?: return
-                fileContents[uri] = text.split("\n")
+                fileContents[uri] = splitLines(text)
             }
 
             "textDocument/didChange" -> {
@@ -58,7 +58,11 @@ class GoLspSemanticLogger {
                 for (change in changes) {
                     val c = change.asJsonObject
                     if (!c.has("range")) {
-                        fileContents[uri] = c.get("text")?.asString?.split("\n") ?: continue
+                        fileContents[uri] = splitLines(c.get("text")?.asString ?: continue)
+                    } else {
+                        val range   = c.getAsJsonObject("range") ?: continue
+                        val newText = c.get("text")?.asString   ?: continue
+                        applyRangeEdit(uri, range, newText)
                     }
                 }
             }
@@ -106,6 +110,31 @@ class GoLspSemanticLogger {
 
         println("\n[SemanticTokens] $fileName")
         decode(data, lines)
+    }
+
+    // -------------------------------------------------------------------------
+    // Content helpers
+    // -------------------------------------------------------------------------
+
+    /** Split on any line ending and strip trailing CR so stored lines are clean. */
+    private fun splitLines(text: String): List<String> =
+        text.split("\n").map { it.trimEnd('\r') }
+
+    /** Apply a single LSP range edit to the stored file lines. */
+    private fun applyRangeEdit(uri: String, range: JsonObject, newText: String) {
+        val lines     = fileContents[uri]?.toMutableList() ?: return
+        val startLine = range.getAsJsonObject("start")?.get("line")?.asInt ?: return
+        val startChar = range.getAsJsonObject("start")?.get("character")?.asInt ?: return
+        val endLine   = range.getAsJsonObject("end")?.get("line")?.asInt ?: return
+        val endChar   = range.getAsJsonObject("end")?.get("character")?.asInt ?: return
+
+        val prefix      = lines.getOrNull(startLine)?.take(startChar) ?: return
+        val suffix      = lines.getOrNull(endLine)?.drop(endChar)     ?: return
+        val replacement = splitLines(prefix + newText + suffix)
+
+        repeat(endLine - startLine + 1) { lines.removeAt(startLine) }
+        lines.addAll(startLine, replacement)
+        fileContents[uri] = lines
     }
 
     // -------------------------------------------------------------------------

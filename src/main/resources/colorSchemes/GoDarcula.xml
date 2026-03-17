@@ -50,9 +50,9 @@
     </option>
 
     <!-- Interface-typed variable: same light blue as interface types -->
-    <option name="GO_VAR_INTERFACE">
-        <value>
-            <option name="FOREGROUND" value="6bafda"/>
-        </value>
-    </option>
+<!--    <option name="GO_VAR_INTERFACE">-->
+<!--        <value>-->
+<!--            <option name="FOREGROUND" value="6bafda"/>-->
+<!--        </value>-->
+<!--    </option>-->
 </list>

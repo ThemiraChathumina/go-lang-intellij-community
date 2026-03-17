@@ -50,7 +50,7 @@ class GoSyntaxHighlighter : SyntaxHighlighterBase() {
 
         // Variable type modifier keys
         val VAR_FUNC        = createTextAttributesKey("GO_VAR_FUNC",        DefaultLanguageHighlighterColors.IDENTIFIER)
-        val VAR_INTERFACE   = createTextAttributesKey("GO_VAR_INTERFACE",   DefaultLanguageHighlighterColors.INTERFACE_NAME)
+        val VAR_INTERFACE   = createTextAttributesKey("GO_VAR_INTERFACE",   DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
         val VAR_POINTER     = createTextAttributesKey("GO_VAR_POINTER",     DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
         val VAR_STRING      = createTextAttributesKey("GO_VAR_STRING",      DefaultLanguageHighlighterColors.LOCAL_VARIABLE)
         val VAR_NUMBER      = createTextAttributesKey("GO_VAR_NUMBER",      DefaultLanguageHighlighterColors.LOCAL_VARIABLE)

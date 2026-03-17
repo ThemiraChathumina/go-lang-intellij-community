@@ -49,7 +49,6 @@ class GoColorSettingsPage : ColorSettingsPage {
             AttributesDescriptor("LSP Semantic Tokens//Parameters//Parameter",                   GoSyntaxHighlighter.PARAMETER),
             AttributesDescriptor("LSP Semantic Tokens//Parameters//Parameter (interface type)",  GoSyntaxHighlighter.PARAM_INTERFACE),
             AttributesDescriptor("LSP Semantic Tokens//Parameters//Parameter (struct type)",     GoSyntaxHighlighter.PARAM_STRUCT),
-            AttributesDescriptor("LSP Semantic Tokens//Struct Field",                            GoSyntaxHighlighter.STRUCT_FIELD),
             AttributesDescriptor("LSP Semantic Tokens//Format Verb (%s, %d, ...)",               GoSyntaxHighlighter.FORMAT_VERB)
         )
     }
@@ -68,22 +67,22 @@ class GoColorSettingsPage : ColorSettingsPage {
         package main
 
         import (
-            "fmt"
-            "context"
+            "<pkg>fmt</pkg>"
+            "<pkg>context</pkg>"
         )
 
         // This is a line comment
         /* This is a block comment */
 
-        const MaxRetries = 3
+        const <constant>MaxRetries</constant> = 3
 
         type <structType>Server</structType> struct {
-            <field>Host</field> <builtin>string</builtin> <tag>`json:"host"`</tag>
-            <field>Port</field> <builtin>int</builtin>    <tag>`json:"port"`</tag>
+            <varStr>Host</varStr> <builtin>string</builtin> `<tag>json</tag>:"host"`
+            <varNum>Port</varNum> <builtin>int</builtin>    `<tag>json</tag>:"port"`
         }
 
         type <interfaceType>Handler</interfaceType> interface {
-            <methodDecl>Handle</methodDecl>(ctx <pkg>context</pkg>.<interfaceType>Context</interfaceType>) <builtin>error</builtin>
+            <methodDecl>Handle</methodDecl>(<varIface>ctx</varIface> <pkg>context</pkg>.<interfaceType>Context</interfaceType>) <builtin>error</builtin>
         }
 
         func <funcDecl>NewServer</funcDecl>[<typeParam>T</typeParam> <interfaceType>Handler</interfaceType>](
@@ -92,23 +91,23 @@ class GoColorSettingsPage : ColorSettingsPage {
             <paramIface>h</paramIface> <interfaceType>Handler</interfaceType>,
             <paramStruct>s</paramStruct> <structType>Server</structType>,
         ) *<structType>Server</structType> {
-            <pkg>fmt</pkg>.<funcCall>Println</funcCall>("retries:", MaxRetries)
-            var fn <varFunc>= func() {}</varFunc>
-            var iface <varIface>Handler</varIface>
-            var ptr <varPtr>*Server</varPtr>
-            var name <varStr>"value"</varStr>
-            var count <varNum>42</varNum>
-            _ = fn; _ = iface; _ = ptr; _ = name; _ = count
+            <pkg>fmt</pkg>.<funcCall>Println</funcCall>("retries:", <constant>MaxRetries</constant>)
+            var <varFunc>fn</varFunc> = func() {}
+            var <varIface>iface</varIface> <interfaceType>Handler</interfaceType>
+            var <varPtr>ptr</varPtr> *<structType>Server</structType>
+            var <varStr>name</varStr> = "value"
+            var <varNum>count</varNum> = 42
+            _ = <varFunc>fn</varFunc>; _ = <varIface>iface</varIface>; _ = <varPtr>ptr</varPtr>; _ = <varStr>name</varStr>; _ = <varNum>count</varNum>
             enabled := <predecl>true</predecl>
             result := <predecl>nil</predecl>
             _ = enabled; _ = result
-            return &<structType>Server</structType>{<field>Host</field>: <param>host</param>, <field>Port</field>: <param>port</param>}
+            return &<structType>Server</structType>{<varStr>Host</varStr>: <param>host</param>, <varNum>Port</varNum>: <param>port</param>}
         }
 
-        func (s *<structType>Server</structType>) <methodDecl>Start</methodDecl>(<param>ctx</param> <pkg>context</pkg>.<interfaceType>Context</interfaceType>) <builtin>error</builtin> {
-            msg := "listen<escape>\t</escape><escape>\n</escape>"
-            <pkg>fmt</pkg>.<funcCall>Sprintf</funcCall>("<fmtVerb>%s</fmtVerb> <fmtVerb>%d</fmtVerb>", s.<field>Host</field>, s.<field>Port</field>)
-            _ = msg
+        func (<varPtr>s</varPtr> *<structType>Server</structType>) <methodDecl>Start</methodDecl>(<paramIface>ctx</paramIface> <pkg>context</pkg>.<interfaceType>Context</interfaceType>) <builtin>error</builtin> {
+            <varStr>msg</varStr> := "listen<escape>\t</escape><escape>\n</escape>"
+            <pkg>fmt</pkg>.<funcCall>Sprintf</funcCall>("<fmtVerb>%s</fmtVerb> <fmtVerb>%d</fmtVerb>", <varPtr>s</varPtr>.<varStr>Host</varStr>, <varPtr>s</varPtr>.<varNum>Port</varNum>)
+            _ = <varStr>msg</varStr>
             return <predecl>nil</predecl>
         }
     """.trimIndent()
@@ -120,10 +119,10 @@ class GoColorSettingsPage : ColorSettingsPage {
             "methodDecl"    to GoSyntaxHighlighter.METHOD_DECLARATION,
             "funcCall"      to GoSyntaxHighlighter.FUNCTION_CALL,
             "methodCall"    to GoSyntaxHighlighter.METHOD_CALL,
-            "field"         to GoSyntaxHighlighter.STRUCT_FIELD,
             "tag"           to GoSyntaxHighlighter.STRUCT_TAG,
             "escape"        to GoSyntaxHighlighter.VALID_STRING_ESCAPE,
             "pkg"           to GoSyntaxHighlighter.PACKAGE_NAME,
+            "constant"      to GoSyntaxHighlighter.CONSTANT,
             "interfaceType" to GoSyntaxHighlighter.INTERFACE_TYPE,
             "structType"    to GoSyntaxHighlighter.STRUCT_TYPE,
             "param"         to GoSyntaxHighlighter.PARAMETER,

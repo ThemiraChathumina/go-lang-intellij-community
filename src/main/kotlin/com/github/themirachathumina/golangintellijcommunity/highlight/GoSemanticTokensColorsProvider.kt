@@ -10,11 +10,11 @@ import com.redhat.devtools.lsp4ij.features.semanticTokens.SemanticTokensColorsPr
  * is driven by LSP tokens, not PSI analysis.
  *
  * Token types handled:
- *   namespace                              → null               (delegated to GoSemanticAnnotator: imports→STRING, code qualifiers→PACKAGE_NAME)
+ *   namespace                              → PACKAGE_NAME       (package qualifier identifiers like fmt, context)
  *   variable [readonly, defaultLibrary]    → PREDECLARED        (nil, true, false)
  *   variable [readonly]                    → CONSTANT           (Go const declarations and usages)
  *   variable [signature]                   → VAR_FUNC           (function-valued variable)
- *   variable [interface]                   → VAR_INTERFACE      (interface-typed variable)
+ *   variable [interface]                   → VAR_INTERFACE      (interface-typed variable, e.g. var h Handler)
  *   variable [pointer]                     → VAR_POINTER        (pointer-typed variable)
  *   variable [string]                      → VAR_STRING         (string-typed variable)
  *   variable [number]                      → VAR_NUMBER         (numeric-typed variable)
@@ -50,10 +50,10 @@ class GoSemanticTokensColorsProvider : SemanticTokensColorsProvider {
         "namespace" -> GoSyntaxHighlighter.PACKAGE_NAME
 
         "variable" -> when {
-            "readonly" in tokenModifiers && "defaultLibrary" in tokenModifiers -> GoSyntaxHighlighter.BUILTIN_TYPE
+            "readonly" in tokenModifiers && "defaultLibrary" in tokenModifiers -> GoSyntaxHighlighter.PREDECLARED
             "readonly" in tokenModifiers -> GoSyntaxHighlighter.CONSTANT
             "signature" in tokenModifiers -> GoSyntaxHighlighter.VAR_FUNC
-            "interface" in tokenModifiers -> GoSyntaxHighlighter.TYPE_NAME
+            "interface" in tokenModifiers -> GoSyntaxHighlighter.VAR_INTERFACE
             "pointer" in tokenModifiers   -> GoSyntaxHighlighter.VAR_POINTER
             "string" in tokenModifiers    -> GoSyntaxHighlighter.VAR_STRING
             "number" in tokenModifiers    -> GoSyntaxHighlighter.VAR_NUMBER
