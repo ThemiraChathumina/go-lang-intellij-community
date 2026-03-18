@@ -49,6 +49,8 @@ class GoTestCommandLineState(
             "GoTest", processHandler, consoleProperties
         )
 
+        consoleView.addMessageFilter(GoConsoleFilter(config.project, config.workingDirectory))
+
         // Refresh gutter icons in all open editors once the test run finishes.
         processHandler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
