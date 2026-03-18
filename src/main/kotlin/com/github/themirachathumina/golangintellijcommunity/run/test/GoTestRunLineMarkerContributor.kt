@@ -7,21 +7,42 @@ import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.DumbAware
 import com.intellij.psi.PsiElement
-import com.intellij.psi.util.PsiTreeUtil
 
 class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
     override fun getInfo(element: PsiElement): Info? {
-        val parent = element.parent
-        if (parent !is GoFunctionName) return null
-
-        val function = parent.parent as? GoFunctionDecl ?: return null
         val file = element.containingFile
         if (!file.name.endsWith("_test.go")) return null
 
-        if (!GoTestRunConfigurationProducer.isTestFunction(function)) return null
+        // 1. Gutter icon for Test Function Declarations
+        val parent = element.parent
+        if (parent is GoFunctionName) {
+            val function = parent.parent as? GoFunctionDecl ?: return null
+            if (GoTestRunConfigurationProducer.isTestFunction(function)) {
+                val testName = function.functionName?.identifier?.text ?: return null
+                return createInfo(testName, element)
+            }
+        }
 
-        val testName = function.functionName.identifier.text
-        val icon = when (GoTestResultsService.getInstance(element.project).getStatus(testName)) {
+        // 2. Gutter icon for Table-Driven Subtest Rows
+        // We attach the icon to the opening '{' of the test case struct literal
+        if (element.text == "{") {
+            val subtestInfo = GoTestRunConfigurationProducer.getSubtestInfo(element)
+            if (subtestInfo != null) {
+                val (testName, subName, anchor) = subtestInfo
+
+                // Only render if the current element is exactly our designated anchor
+                if (element == anchor) {
+                    val fullTestName = "$testName/$subName"
+                    return createInfo(fullTestName, element)
+                }
+            }
+        }
+
+        return null
+    }
+
+    private fun createInfo(fullTestName: String, element: PsiElement): Info {
+        val icon = when (GoTestResultsService.getInstance(element.project).getStatus(fullTestName)) {
             GoTestResultsService.Status.PASSED  -> AllIcons.RunConfigurations.TestState.Green2
             GoTestResultsService.Status.FAILED  -> AllIcons.RunConfigurations.TestState.Red2
             GoTestResultsService.Status.SKIPPED -> AllIcons.RunConfigurations.TestState.Yellow2
@@ -29,6 +50,6 @@ class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
         }
 
         val actions = ExecutorAction.getActions()
-        return Info(icon, { testName }, *actions)
+        return Info(icon, { fullTestName }, *actions)
     }
 }
