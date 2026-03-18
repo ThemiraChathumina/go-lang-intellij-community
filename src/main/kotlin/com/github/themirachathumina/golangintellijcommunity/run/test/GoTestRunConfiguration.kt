@@ -34,9 +34,17 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         get() = state.workingDirectory
         set(value) { state.workingDirectory = FileUtil.toSystemIndependentName(value) }
 
+    var outputDirectory: String
+        get() = state.outputDirectory
+        set(value) { state.outputDirectory = FileUtil.toSystemIndependentName(value) }
+
     var buildTags: String
         get() = state.buildTags
         set(value) { state.buildTags = value }
+
+    var useAllCustomBuildTags: Boolean
+        get() = state.useAllCustomBuildTags
+        set(value) { state.useAllCustomBuildTags = value }
 
     var envVariables: MutableMap<String, String>
         get() = state.envVariables
@@ -50,9 +58,27 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         get() = state.isRace
         set(value) { state.isRace = value }
 
+    var isVerbose: Boolean
+        get() = state.isVerbose
+        set(value) { state.isVerbose = value }
+
+    var programArguments: String
+        get() = state.programArguments
+        set(value) { state.programArguments = value }
+
+    var goToolArguments: String
+        get() = state.goToolArguments
+        set(value) { state.goToolArguments = value }
+
+    var moduleName: String
+        get() = state.moduleName
+        set(value) { state.moduleName = value }
+
+    var runWithElevatedPrivileges: Boolean
+        get() = state.runWithElevatedPrivileges
+        set(value) { state.runWithElevatedPrivileges = value }
+
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
-        // We'll implement this editor later if needed, returning a dummy for now.
-        // Actually, for Phase 2, a dummy might be fine but it needs to be valid.
         return GoTestSettingsEditor(project)
     }
 
@@ -94,8 +120,12 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         var targetPath: String = ""
         @Attribute("workingDirectory")
         var workingDirectory: String = ""
+        @Attribute("outputDirectory")
+        var outputDirectory: String = ""
         @Attribute("buildTags")
         var buildTags: String = ""
+        @Attribute("useAllCustomBuildTags")
+        var useAllCustomBuildTags: Boolean = false
 
         @Tag("envs")
         @XMap(entryTagName = "env", keyAttributeName = "name", valueAttributeName = "value")
@@ -105,16 +135,33 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         var isShort: Boolean = false
         @Attribute("isRace")
         var isRace: Boolean = false
+        @Attribute("isVerbose")
+        var isVerbose: Boolean = false
+        @Attribute("programArguments")
+        var programArguments: String = ""
+        @Attribute("goToolArguments")
+        var goToolArguments: String = ""
+        @Attribute("moduleName")
+        var moduleName: String = ""
+        @Attribute("runWithElevatedPrivileges")
+        var runWithElevatedPrivileges: Boolean = false
 
         fun copy(): GoTestRunConfigurationState {
             val copy = GoTestRunConfigurationState()
             copy.scope = this.scope
             copy.targetPath = this.targetPath
             copy.workingDirectory = this.workingDirectory
+            copy.outputDirectory = this.outputDirectory
             copy.buildTags = this.buildTags
+            copy.useAllCustomBuildTags = this.useAllCustomBuildTags
             copy.envVariables = HashMap(this.envVariables)
             copy.isShort = this.isShort
             copy.isRace = this.isRace
+            copy.isVerbose = this.isVerbose
+            copy.programArguments = this.programArguments
+            copy.goToolArguments = this.goToolArguments
+            copy.moduleName = this.moduleName
+            copy.runWithElevatedPrivileges = this.runWithElevatedPrivileges
             return copy
         }
     }

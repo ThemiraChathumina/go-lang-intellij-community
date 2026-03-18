@@ -14,6 +14,7 @@ import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.util.execution.ParametersListUtil
 
 class GoTestCommandLineState(
     env: ExecutionEnvironment,
@@ -29,6 +30,9 @@ class GoTestCommandLineState(
         commandLine.addParameter("test")
         commandLine.addParameter("-json")
 
+        if (config.isVerbose) {
+            commandLine.addParameter("-v")
+        }
         if (config.isShort) {
             commandLine.addParameter("-short")
         }
@@ -40,6 +44,11 @@ class GoTestCommandLineState(
             commandLine.addParameter(config.buildTags)
         }
 
+        // Extra go tool arguments from the UI
+        if (config.goToolArguments.isNotBlank()) {
+            ParametersListUtil.parse(config.goToolArguments).forEach { commandLine.addParameter(it) }
+        }
+
         when (config.scope) {
             GoTestScope.DIRECTORY -> {
                 commandLine.addParameter("./...")
@@ -49,8 +58,7 @@ class GoTestCommandLineState(
                 commandLine.addParameter(config.targetPath)
             }
             GoTestScope.FILE -> {
-                // To avoid "command-line-arguments [build failed]", we must run the package (.)
-                // rather than the individual file, ensuring all package dependencies are built.
+                // Run the package (.) so all package dependencies are built correctly
                 commandLine.addParameter(".")
             }
             GoTestScope.FUNCTION -> {
@@ -63,6 +71,12 @@ class GoTestCommandLineState(
                     commandLine.addParameter(config.targetPath)
                 }
             }
+        }
+
+        // Program arguments passed to the test binary (after --)
+        if (config.programArguments.isNotBlank()) {
+            commandLine.addParameter("--")
+            ParametersListUtil.parse(config.programArguments).forEach { commandLine.addParameter(it) }
         }
 
         commandLine.withWorkDirectory(FileUtil.toSystemDependentName(config.workingDirectory))
@@ -79,7 +93,7 @@ class GoTestCommandLineState(
         consoleProperties.setProcessHandler(processHandler)
 
         val consoleView = SMTestRunnerConnectionUtil.createAndAttachConsole("GoTest", processHandler, consoleProperties)
-        
+
         return com.intellij.execution.DefaultExecutionResult(consoleView, processHandler)
     }
 
@@ -91,7 +105,6 @@ class GoTestCommandLineState(
 
         override fun notifyTextAvailable(text: String, outputType: Key<*>) {
             if (outputType == ProcessOutputTypes.STDOUT) {
-                // translateLine handles suppression of raw JSON and redirection to TeamCity
                 val translated = retranslator.translateLine(text)
                 if (translated != null) {
                     super.notifyTextAvailable(translated, outputType)
