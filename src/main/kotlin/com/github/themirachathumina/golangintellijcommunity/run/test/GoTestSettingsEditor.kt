@@ -19,6 +19,10 @@ import javax.swing.event.DocumentEvent
 
 class GoTestSettingsEditor(private val project: Project) : SettingsEditor<GoTestRunConfiguration>() {
 
+    private val testKindComboBox = ComboBox(GoTestKind.entries.toTypedArray()).apply {
+        addActionListener { fireEditorStateChanged() }
+    }
+
     private val scopeComboBox = ComboBox(GoTestScope.entries.toTypedArray()).apply {
         addActionListener {
             updateTargetPathLabel()
@@ -124,6 +128,9 @@ class GoTestSettingsEditor(private val project: Project) : SettingsEditor<GoTest
             row("Test framework:") {
                 label("gotest")
             }
+            row("Action:") {
+                cell(testKindComboBox).align(AlignX.FILL)
+            }.comment("Choose between standard tests or benchmarks")
             row("Test kind:") {
                 cell(scopeComboBox).align(AlignX.FILL)
             }
@@ -162,6 +169,7 @@ class GoTestSettingsEditor(private val project: Project) : SettingsEditor<GoTest
     }
 
     override fun resetEditorFrom(config: GoTestRunConfiguration) {
+        testKindComboBox.item = config.testKind
         scopeComboBox.item = config.scope
         targetPathField.text = config.targetPath
         outputDirectoryField.text = config.outputDirectory
@@ -177,6 +185,7 @@ class GoTestSettingsEditor(private val project: Project) : SettingsEditor<GoTest
     }
 
     override fun applyEditorTo(config: GoTestRunConfiguration) {
+        config.testKind = testKindComboBox.item ?: GoTestKind.TEST
         config.scope = currentScope()
         config.targetPath = targetPathField.text
         config.outputDirectory = outputDirectoryField.text

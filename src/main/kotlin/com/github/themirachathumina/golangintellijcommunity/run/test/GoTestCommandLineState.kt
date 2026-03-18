@@ -29,13 +29,9 @@ class GoTestCommandLineState(
     private val config: GoTestRunConfiguration
 ) : CommandLineState(env) {
 
-    /** Coverage profile path; set only when the Coverage executor is used. */
     private var coverageFilePath: String? = null
 
     override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult {
-        // When running via the Coverage executor, retrieve (or create) the
-        // CoverageEnabledConfiguration for this run config so we can get the
-        // temp .out file path to pass to `go test -coverprofile=...`.
         if (executor is CoverageExecutor) {
             val covConfig = CoverageEnabledConfiguration.getOrCreate(config)
             coverageFilePath = covConfig.getCoverageFilePath()
@@ -49,9 +45,6 @@ class GoTestCommandLineState(
             "GoTest", processHandler, consoleProperties
         )
 
-        consoleView.addMessageFilter(GoConsoleFilter(config.project, config.workingDirectory))
-
-        // Refresh gutter icons in all open editors once the test run finishes.
         processHandler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
                 ApplicationManager.getApplication().invokeLater {
@@ -85,17 +78,12 @@ class GoTestCommandLineState(
             commandLine.addParameter(config.buildTags)
         }
 
-        // Coverage profile — only injected when launched via CoverageExecutor.
-        // -covermode=count: record actual execution counts (not just 0/1 as in "set" mode).
-        // -count=1: disable Go's test-result cache so every coverage run produces fresh
-        //           counters; cached results replay old coverage data and ignore -covermode.
         coverageFilePath?.let {
             commandLine.addParameter("-coverprofile=$it")
             commandLine.addParameter("-covermode=count")
             commandLine.addParameter("-count=1")
         }
 
-        // Extra go tool arguments from the settings UI
         if (config.goToolArguments.isNotBlank()) {
             ParametersListUtil.parse(config.goToolArguments).forEach { commandLine.addParameter(it) }
         }
@@ -104,22 +92,66 @@ class GoTestCommandLineState(
             GoTestScope.DIRECTORY -> {
                 commandLine.addParameter("./...")
                 commandLine.withWorkDirectory(FileUtil.toSystemDependentName(config.targetPath))
+                if (config.testKind == GoTestKind.BENCHMARK) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-bench=.")
+                } else if (config.testKind == GoTestKind.FUZZ) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-fuzz=.")
+                }
             }
-            GoTestScope.PACKAGE -> commandLine.addParameter(config.targetPath)
-            GoTestScope.FILE    -> commandLine.addParameter(".")
+            GoTestScope.PACKAGE -> {
+                commandLine.addParameter(config.targetPath)
+                if (config.testKind == GoTestKind.BENCHMARK) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-bench=.")
+                } else if (config.testKind == GoTestKind.FUZZ) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-fuzz=.")
+                }
+            }
+            GoTestScope.FILE -> {
+                commandLine.addParameter(".")
+                if (config.testKind == GoTestKind.BENCHMARK) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-bench=.")
+                } else if (config.testKind == GoTestKind.FUZZ) {
+                    commandLine.addParameter("-run=^$")
+                    commandLine.addParameter("-fuzz=.")
+                }
+            }
             GoTestScope.FUNCTION -> {
                 val parts = config.targetPath.split(":")
                 if (parts.size == 2) {
                     commandLine.addParameter(parts[0])
-                    commandLine.addParameter("-run")
-                    commandLine.addParameter("^${parts[1]}$")
+                    val funcName = parts[1]
+
+                    when (config.testKind) {
+                        GoTestKind.BENCHMARK -> {
+                            commandLine.addParameter("-run=^$")
+                            commandLine.addParameter("-bench=^$funcName$")
+                        }
+                        GoTestKind.FUZZ -> {
+                            commandLine.addParameter("-run=^$")
+                            commandLine.addParameter("-fuzz=^$funcName$")
+                        }
+                        GoTestKind.TEST -> {
+                            commandLine.addParameter("-run=^$funcName$")
+                        }
+                    }
                 } else {
                     commandLine.addParameter(config.targetPath)
+                    if (config.testKind == GoTestKind.BENCHMARK) {
+                        commandLine.addParameter("-run=^$")
+                        commandLine.addParameter("-bench=.")
+                    } else if (config.testKind == GoTestKind.FUZZ) {
+                        commandLine.addParameter("-run=^$")
+                        commandLine.addParameter("-fuzz=.")
+                    }
                 }
             }
         }
 
-        // Program arguments passed to the test binary (after --)
         if (config.programArguments.isNotBlank()) {
             commandLine.addParameter("--")
             ParametersListUtil.parse(config.programArguments).forEach { commandLine.addParameter(it) }
@@ -128,14 +160,11 @@ class GoTestCommandLineState(
         commandLine.withWorkDirectory(FileUtil.toSystemDependentName(config.workingDirectory))
         commandLine.withEnvironment(config.envVariables)
 
-        // Build the setup lines that appear at the top of the console (folded by GoConsoleFolding).
         val setupLines = buildList {
             if (sdkPath.isNotEmpty()) add("GOROOT=$sdkPath")
             add(commandLine.commandLineString)
         }
 
-        // Wire the retranslator's result callback to GoTestResultsService so the
-        // line marker contributor can pick up pass/fail status for gutter icons.
         val resultsService = GoTestResultsService.getInstance(config.project)
         val onTestResult: (String, Boolean?) -> Unit = { testName, passed ->
             val status = when (passed) {
@@ -151,10 +180,6 @@ class GoTestCommandLineState(
         return handler
     }
 
-    /**
-     * Filters raw JSON stdout into TeamCity service messages for the SMTestRunner,
-     * and emits foldable `#gosetup` lines before the process output begins.
-     */
     private class GoTestProcessHandler(
         commandLine: GeneralCommandLine,
         private val setupLines: List<String>,
@@ -163,13 +188,9 @@ class GoTestCommandLineState(
 
         private val retranslator = GoTestJsonRetranslator(onTestResult)
 
-        // Suppresses the automatic command-line echo that OSProcessHandler emits in
-        // startNotify() so we don't print it twice (we already emit it as a #gosetup line).
         @Volatile private var skipNextCommandEcho = false
 
         override fun startNotify() {
-            // Emit each setup line before the process starts so they appear at the
-            // very top of the console and the ConsoleFolding can collapse them.
             setupLines.forEach { line ->
                 notifyTextAvailable("$line #gosetup\n", ProcessOutputTypes.SYSTEM)
             }
@@ -178,7 +199,6 @@ class GoTestCommandLineState(
         }
 
         override fun notifyTextAvailable(text: String, outputType: Key<*>) {
-            // Drop the duplicate command echo from OSProcessHandler.startNotify().
             if (skipNextCommandEcho && outputType == ProcessOutputTypes.SYSTEM) {
                 skipNextCommandEcho = false
                 return

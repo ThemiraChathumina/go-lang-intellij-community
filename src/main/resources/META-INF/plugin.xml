@@ -68,7 +68,9 @@
 
         <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoFileRunConfigurationProducer"/>
         <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.GoPackageRunConfigurationProducer"/>
-        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfigurationProducer"/>
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfigurationProducer" order="first"/>
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoBenchmarkRunConfigurationProducer"/>
+        <runConfigurationProducer implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoFuzzRunConfigurationProducer"/>
         <runLineMarkerContributor
                 language="Go"
                 implementationClass="com.github.themirachathumina.golangintellijcommunity.run.GoRunLineMarkerContributor"/>

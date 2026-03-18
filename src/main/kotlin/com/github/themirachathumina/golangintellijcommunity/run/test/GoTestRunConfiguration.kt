@@ -14,9 +14,6 @@ import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XMap
 import org.jdom.Element
 
-/**
- * Run configuration for Go tests.
- */
 class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     LocatableConfigurationBase<RunProfileState>(project, factory, name) {
 
@@ -61,6 +58,10 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
     var isVerbose: Boolean
         get() = state.isVerbose
         set(value) { state.isVerbose = value }
+
+    var testKind: GoTestKind
+        get() = state.testKind
+        set(value) { state.testKind = value }
 
     var programArguments: String
         get() = state.programArguments
@@ -137,6 +138,10 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         var isRace: Boolean = false
         @Attribute("isVerbose")
         var isVerbose: Boolean = false
+
+        @Attribute("testKind")
+        var testKind: GoTestKind = GoTestKind.TEST
+
         @Attribute("programArguments")
         var programArguments: String = ""
         @Attribute("goToolArguments")
@@ -158,6 +163,7 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
             copy.isShort = this.isShort
             copy.isRace = this.isRace
             copy.isVerbose = this.isVerbose
+            copy.testKind = this.testKind
             copy.programArguments = this.programArguments
             copy.goToolArguments = this.goToolArguments
             copy.moduleName = this.moduleName

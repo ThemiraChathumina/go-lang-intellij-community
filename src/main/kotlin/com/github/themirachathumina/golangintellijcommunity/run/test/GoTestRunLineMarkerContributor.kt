@@ -17,9 +17,11 @@ class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
         val parent = element.parent
         if (parent is GoFunctionName) {
             val function = parent.parent as? GoFunctionDecl ?: return null
-            if (GoTestRunConfigurationProducer.isTestFunction(function)) {
+            if (GoTestRunConfigurationProducer.isTestFunction(function) ||
+                GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(function)) {
+
                 val testName = function.functionName?.identifier?.text ?: return null
-                return createInfo(testName, element)
+                return createTestStatusInfo(testName, element)
             }
         }
 
@@ -42,6 +44,18 @@ class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
     }
 
     private fun createInfo(fullTestName: String, element: PsiElement): Info {
+        val icon = when (GoTestResultsService.getInstance(element.project).getStatus(fullTestName)) {
+            GoTestResultsService.Status.PASSED  -> AllIcons.RunConfigurations.TestState.Green2
+            GoTestResultsService.Status.FAILED  -> AllIcons.RunConfigurations.TestState.Red2
+            GoTestResultsService.Status.SKIPPED -> AllIcons.RunConfigurations.TestState.Yellow2
+            null                                -> AllIcons.RunConfigurations.TestState.Run
+        }
+
+        val actions = ExecutorAction.getActions()
+        return Info(icon, { fullTestName }, *actions)
+    }
+
+    private fun createTestStatusInfo(fullTestName: String, element: PsiElement): Info {
         val icon = when (GoTestResultsService.getInstance(element.project).getStatus(fullTestName)) {
             GoTestResultsService.Status.PASSED  -> AllIcons.RunConfigurations.TestState.Green2
             GoTestResultsService.Status.FAILED  -> AllIcons.RunConfigurations.TestState.Red2
