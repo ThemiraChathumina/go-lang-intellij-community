@@ -1,0 +1,91 @@
+package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
+
+import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
+import com.intellij.coverage.CoverageDataManager
+import com.intellij.coverage.CoverageExecutor
+import com.intellij.coverage.CoverageRunnerData
+import com.intellij.execution.configurations.ConfigurationInfoProvider
+import com.intellij.execution.configurations.RunProfile
+import com.intellij.execution.configurations.RunProfileState
+import com.intellij.execution.configurations.RunnerSettings
+import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.runners.GenericProgramRunner
+import com.intellij.execution.runners.RunContentBuilder
+import com.intellij.execution.ui.RunContentDescriptor
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.newvfs.RefreshQueue
+import java.io.File
+import java.nio.file.Paths
+
+/**
+ * Program runner that enables "Run with Coverage" for Go test configurations.
+ *
+ * This implementation follows the Flutter plugin's pattern: it executes the
+ * state, attaches a process listener, and upon termination, refreshes the
+ * VFS for the coverage output file before triggering the [CoverageDataManager]
+ * to process the gathered data.
+ */
+class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
+
+    override fun getRunnerId(): String = "GoCoverageProgramRunner"
+
+    override fun canRun(executorId: String, profile: RunProfile): Boolean =
+        executorId == CoverageExecutor.EXECUTOR_ID && profile is GoTestRunConfiguration
+
+    override fun createConfigurationData(settingsProvider: ConfigurationInfoProvider): RunnerSettings {
+        return CoverageRunnerData()
+    }
+
+    override fun doExecute(state: RunProfileState, environment: ExecutionEnvironment): RunContentDescriptor? {
+        val executionResult = state.execute(environment.executor, this) ?: return null
+        val handler = executionResult.processHandler
+
+        handler.addProcessListener(object : ProcessAdapter() {
+            override fun processTerminated(event: ProcessEvent) {
+                ApplicationManager.getApplication().invokeLater {
+                    processCoverage(environment)
+                }
+            }
+        })
+
+        return RunContentBuilder(executionResult, environment).showRunContent(environment.contentToReuse)
+    }
+
+    private fun processCoverage(env: ExecutionEnvironment) {
+        val runConfig = env.runProfile as? GoTestRunConfiguration ?: return
+        val coverageConfig = CoverageEnabledConfiguration.getOrCreate(runConfig)
+        val pathStr = coverageConfig.coverageFilePath ?: return
+
+        val path = Paths.get(pathStr)
+        val parent = path.parent ?: return
+
+        // findFileByNioFile is a cache-only lookup — no disk I/O on EDT.
+        // The parent directory (e.g. system temp) is virtually always already in VFS.
+        val parentVFile = LocalFileSystem.getInstance().findFileByNioFile(parent)
+
+        val afterRefresh = Runnable {
+            if (File(pathStr).exists()) {
+                val settings = env.runnerSettings
+                if (settings != null) {
+                    CoverageDataManager.getInstance(env.project)
+                        .processGatheredCoverage(runConfig, settings)
+                }
+            }
+        }
+
+        if (parentVFile != null) {
+            // Async refresh: disk scan happens off-EDT; afterRefresh runs on EDT when done.
+            RefreshQueue.getInstance().refresh(true, true, afterRefresh, parentVFile)
+        } else {
+            // Parent not yet in VFS — fall back to running directly on a background thread.
+            ApplicationManager.getApplication().executeOnPooledThread {
+                LocalFileSystem.getInstance().refreshAndFindFileByNioFile(parent)
+                ApplicationManager.getApplication().invokeLater(afterRefresh)
+            }
+        }
+    }
+}

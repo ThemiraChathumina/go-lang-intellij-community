@@ -1,0 +1,14 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Program runner that enables "Run with Coverage" for Go test configurations -->
+        <programRunner
+                implementation="com.github.themirachathumina.golangintellijcommunity.run.test.coverage.GoCoverageProgramRunner"/>
+        <!-- Coverage engine and runner for `go test -coverprofile` -->
+        <coverageEngine
+                implementation="com.github.themirachathumina.golangintellijcommunity.run.test.coverage.GoCoverageEngine"/>
+        <coverageRunner
+                implementation="com.github.themirachathumina.golangintellijcommunity.run.test.coverage.GoCoverageRunner"/>
+        <projectService
+                serviceImplementation="com.github.themirachathumina.golangintellijcommunity.run.test.coverage.GoCoverageAnnotator"/>
+    </extensions>
+</idea-plugin>

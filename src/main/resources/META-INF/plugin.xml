@@ -9,6 +9,7 @@
     <depends>com.redhat.devtools.lsp4ij</depends>
     <depends>com.intellij.modules.vcs</depends>
     <depends>Git4Idea</depends>
+    <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
@@ -16,6 +17,8 @@
     <extensions defaultExtensionNs="com.intellij">
         <applicationService
                 serviceImplementation="com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings"/>
+        <projectService
+                serviceImplementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestResultsService"/>
         <applicationConfigurable
                 parentId="language"
                 instance="com.github.themirachathumina.golangintellijcommunity.settings.GoLanguageConfigurable"
@@ -111,6 +114,15 @@
                 class="com.github.themirachathumina.golangintellijcommunity.ide.actions.GoCreateFileAction">
             <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>
         </action>
+
+        <!-- Tools > Go > Clean Test Cache -->
+        <group id="Go.ToolsMenu" text="Go" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Go.CleanTestCache"
+                    class="com.github.themirachathumina.golangintellijcommunity.run.test.GoCleanTestCacheAction"
+                    text="Clean Go Test Cache"
+                    description="Runs 'go clean -testcache' to invalidate the test result cache"/>
+        </group>
     </actions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">

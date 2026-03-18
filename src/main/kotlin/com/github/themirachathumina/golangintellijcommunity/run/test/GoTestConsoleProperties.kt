@@ -19,9 +19,9 @@ class GoTestConsoleProperties(
     private var processHandler: ProcessHandler? = null
 
     init {
-        // Use name-based tree for simplicity, as we emit name-based TeamCity messages.
-        // If this were true, we would need to provide 'nodeId' in all messages.
-        isIdBasedTestTree = false
+        // All our service messages carry 'nodeId' / 'parentNodeId', so use the
+        // id-based tree mode for precise parent-child placement.
+        isIdBasedTestTree = true
     }
 
     override fun getTestLocator(): SMTestLocator {

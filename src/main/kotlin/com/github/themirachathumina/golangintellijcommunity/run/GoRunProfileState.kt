@@ -153,11 +153,11 @@ class GoRunProcessHandler(
     }
 
     private fun emitSetupBlock(buildSucceeded: Boolean) {
-        notifyTextAvailable("  GOROOT=${buildResult.goRoot}\n", ProcessOutputTypes.SYSTEM)
-        notifyTextAvailable("  GOPATH=${buildResult.goPath}\n", ProcessOutputTypes.SYSTEM)
-        notifyTextAvailable("  ${buildResult.buildCmdString}\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("GOROOT=${buildResult.goRoot} #gosetup\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("GOPATH=${buildResult.goPath} #gosetup\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("${buildResult.buildCmdString} #gosetup\n", ProcessOutputTypes.SYSTEM)
         if (buildSucceeded) {
-            notifyTextAvailable("  ${runCmd.commandLineString}\n", ProcessOutputTypes.SYSTEM)
+            notifyTextAvailable("${runCmd.commandLineString} #gosetup\n", ProcessOutputTypes.SYSTEM)
         }
     }
 

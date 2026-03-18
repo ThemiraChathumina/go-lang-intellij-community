@@ -5,12 +5,12 @@ import com.intellij.openapi.project.Project
 
 class GoConsoleFolding : ConsoleFolding() {
 
-    override fun shouldFoldLine(project: Project, line: String): Boolean {
-        // Fold the indented setup lines emitted by GoRunProcessHandler
-        return line.startsWith("  ")
-    }
+    // Both GoRunProcessHandler and GoTestProcessHandler tag their setup lines with
+    // "#gosetup" so we can fold them without accidentally catching indented test-log
+    // lines like "    main_test.go:58: ..." which also start with spaces.
+    override fun shouldFoldLine(project: Project, line: String): Boolean =
+        line.trimEnd().endsWith("#gosetup")
 
-    override fun getPlaceholderText(project: Project, lines: List<String>): String {
-        return "<${lines.size} go setup calls>"
-    }
+    override fun getPlaceholderText(project: Project, lines: List<String>): String =
+        "<${lines.size} go setup calls>"
 }
