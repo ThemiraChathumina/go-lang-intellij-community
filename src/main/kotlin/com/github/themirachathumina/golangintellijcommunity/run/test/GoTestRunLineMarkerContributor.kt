@@ -43,8 +43,9 @@ class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
             }
         }
 
-        // 2. Gutter icon for Table-Driven Subtest Rows
-        // We attach the icon to the opening '{' of the test case struct literal
+        // Gutter icon for table-driven subtest rows — only when the test function uses t.Run().
+        // Attach to the opening '{' of each row's struct literal; getSubtestInfo returns null
+        // when the function has no t.Run call, so non-subtest tables are never decorated.
         if (element.text == "{") {
             val subtestInfo = GoTestRunConfigurationProducer.getSubtestInfo(element)
             if (subtestInfo != null) {

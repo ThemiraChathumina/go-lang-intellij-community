@@ -148,6 +148,11 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
             return name.startsWith("Test") || name.startsWith("Fuzz") || name.startsWith("Example")
         }
 
+        /** Returns true if [function] contains at least one `*.Run(...)` call site (i.e. `t.Run`). */
+        private fun functionUsesSubtests(function: GoFunctionDecl): Boolean =
+            PsiTreeUtil.findChildrenOfType(function, GoOperandName::class.java)
+                .any { it.text.endsWith(".Run") }
+
         fun getSubtestInfo(element: PsiElement): Triple<String, String, PsiElement>? {
             var current: PsiElement? = element
             var rowLiteral: GoLiteralValue? = null
@@ -171,6 +176,11 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
 
             val function = PsiTreeUtil.getParentOfType(rowLiteral, GoFunctionDecl::class.java) ?: return null
             val testName = function.functionName?.identifier?.text ?: return null
+
+            // Only show subtest gutter icons when the function actually calls t.Run(...).
+            // Without t.Run the loop iterations are not named subtests and cannot be targeted
+            // individually with -run, so the icons would be misleading.
+            if (!functionUsesSubtests(function)) return null
 
             val firstString = PsiTreeUtil.findChildrenOfType(rowLiteral, GoStringLiteral::class.java)
                 .minByOrNull { it.textOffset } ?: return null
