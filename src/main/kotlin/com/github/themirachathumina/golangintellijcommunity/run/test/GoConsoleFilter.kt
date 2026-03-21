@@ -2,44 +2,70 @@ package com.github.themirachathumina.golangintellijcommunity.run.test
 
 import com.intellij.execution.filters.Filter
 import com.intellij.execution.filters.OpenFileHyperlinkInfo
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
 import java.io.File
 
 /**
- * Scans console output for Go error locations (e.g. "main_test.go:88") and
+ * Scans console output for Go file locations (e.g. "main_test.go:88") and
  * turns them into clickable hyperlinks.
+ *
+ * All matches on a single line are hyperlinked.  File resolution order:
+ *   1. Absolute path (used as-is)
+ *   2. Relative to [workingDirectory]
+ *   3. Project-wide search by filename (covers per-test output panes where the
+ *      working directory is unknown)
  */
 class GoConsoleFilter(
     private val project: Project,
-    private val workingDirectory: String
+    private val workingDirectory: String = project.basePath ?: ""
 ) : Filter {
 
-    // Matches paths like "main_test.go:88" or "C:\foo\bar_test.go:12"
+    // Matches "some_file.go:42" – with or without a leading absolute path segment
     private val pattern = Regex("""((?:[a-zA-Z]:[\\/])?[\w\-.\\/]+?\.go):(\d+)""")
 
     override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
-        val match = pattern.find(line) ?: return null
-        val fileStr = match.groupValues[1]
-        val lineNum = match.groupValues[2].toIntOrNull() ?: return null
-
-        val file = if (File(fileStr).isAbsolute) {
-            LocalFileSystem.getInstance().findFileByPath(fileStr.replace('\\', '/'))
-        } else {
-            LocalFileSystem.getInstance().findFileByPath(
-                File(workingDirectory, fileStr).absolutePath.replace('\\', '/')
-            )
-        } ?: return null
+        val matches = pattern.findAll(line).toList()
+        if (matches.isEmpty()) return null
 
         val textStartOffset = entireLength - line.length
+        val items = matches.mapNotNull { match ->
+            val fileStr = match.groupValues[1]
+            val lineNum = match.groupValues[2].toIntOrNull() ?: return@mapNotNull null
+            val vFile   = resolveFile(fileStr) ?: return@mapNotNull null
 
-        // match.range contains the precise bounds for the entire "main_test.go:88" match
-        val matchStart = textStartOffset + match.range.first
-        val matchEnd = textStartOffset + match.range.last + 1
+            Filter.ResultItem(
+                textStartOffset + match.range.first,
+                textStartOffset + match.range.last + 1,
+                OpenFileHyperlinkInfo(project, vFile, lineNum - 1, 0)
+            )
+        }
+        return if (items.isEmpty()) null else Filter.Result(items)
+    }
 
-        // Line numbers are 0-indexed in the IntelliJ VFS
-        val hyperlinkInfo = OpenFileHyperlinkInfo(project, file, lineNum - 1, 0)
+    private fun resolveFile(fileStr: String): VirtualFile? {
+        val lfs = LocalFileSystem.getInstance()
 
-        return Filter.Result(matchStart, matchEnd, hyperlinkInfo)
+        // 1. Absolute path
+        if (File(fileStr).isAbsolute) {
+            return lfs.findFileByPath(fileStr.replace('\\', '/'))
+        }
+
+        // 2. Relative to the working directory (most precise when available)
+        val direct = lfs.findFileByPath(
+            File(workingDirectory, fileStr).absolutePath.replace('\\', '/')
+        )
+        if (direct != null) return direct
+
+        // 3. Project-wide search by base filename
+        val fileName = File(fileStr).name
+        return ApplicationManager.getApplication().runReadAction<VirtualFile?> {
+            FilenameIndex.getVirtualFilesByName(fileName, GlobalSearchScope.projectScope(project))
+                .firstOrNull()
+        }
     }
 }

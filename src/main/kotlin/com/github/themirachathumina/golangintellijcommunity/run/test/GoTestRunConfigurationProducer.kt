@@ -25,6 +25,8 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
         val file = element.containingFile as? GoFile ?: return false
 
         if (!file.name.endsWith("_test.go")) return false
+        if (GoTestProducerGate.shouldSuppress(file, element)) return false
+
         val virtualFile = file.virtualFile ?: return false
         val packageDir = virtualFile.parent.path
 
@@ -45,6 +47,10 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
         val function = PsiTreeUtil.getParentOfType(element, GoFunctionDecl::class.java)
         if (function != null && isTestFunction(function)) {
             val testName = function.functionName?.identifier?.text ?: return false
+
+            // Let GoFuzzRunConfigurationProducer handle Fuzz functions exclusively
+            if (testName.startsWith("Fuzz")) return false
+
             config.testKind = GoTestKind.TEST
 
             if (testName == "TestMain") {
@@ -52,12 +58,6 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
                 config.targetPath = "."
                 config.workingDirectory = packageDir
                 config.name = file.name
-            } else if (testName.startsWith("Fuzz")) {
-                config.scope = GoTestScope.FUNCTION
-                config.targetPath = ".:$testName"
-                config.workingDirectory = packageDir
-                // UI matches: Run 'go test FuzzReverse ...'
-                config.name = "go test $testName ..."
             } else {
                 config.scope = GoTestScope.FUNCTION
                 config.targetPath = ".:$testName"
@@ -68,6 +68,10 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
             sourceElement.set(function.functionName?.identifier ?: function)
             return true
         }
+
+        // If the cursor is inside a function but it wasn't handled above, it is a
+        // non-test function (e.g. BenchmarkXxx). Don't fall through to file-scope.
+        if (function != null) return false
 
         val allFunctions = PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java)
         if (allFunctions.none { isTestFunction(it) }) return false

@@ -20,6 +20,10 @@ class GoPackageRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConf
     ): Boolean {
         val location = context.psiLocation ?: return false
 
+        // Don't offer "Run package" when right-clicking a test file — the test
+        // producers handle that context instead.
+        if (location.containingFile?.name?.endsWith("_test.go") == true) return false
+
         val directory: PsiDirectory = when (location) {
             is PsiDirectory -> location
             else -> location.containingFile?.containingDirectory ?: return false

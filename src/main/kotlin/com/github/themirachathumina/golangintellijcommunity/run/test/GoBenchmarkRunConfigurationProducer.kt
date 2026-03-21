@@ -25,6 +25,8 @@ class GoBenchmarkRunConfigurationProducer : LazyRunConfigurationProducer<GoTestR
         val file = element.containingFile as? GoFile ?: return false
 
         if (!file.name.endsWith("_test.go")) return false
+        if (GoTestProducerGate.shouldSuppress(file, element)) return false
+
         val virtualFile = file.virtualFile ?: return false
         val packageDir = virtualFile.parent.path
 
@@ -53,6 +55,10 @@ class GoBenchmarkRunConfigurationProducer : LazyRunConfigurationProducer<GoTestR
             sourceElement.set(function.functionName?.identifier ?: function)
             return true
         }
+
+        // If the cursor is inside a function but it wasn't handled above, it is a
+        // non-benchmark function (e.g. TestXxx, FuzzXxx). Don't fall through to file-scope.
+        if (function != null) return false
 
         val allFunctions = PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java)
         if (allFunctions.none { isBenchmarkFunction(it) }) return false

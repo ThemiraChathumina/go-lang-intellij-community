@@ -1,4 +1,15 @@
 <idea-plugin>
+    <actions>
+        <!--
+          "Run with Coverage" submenu inside the "More run/debug" section of the editor
+          right-click menu. Shown when multiple Go test configurations match the context.
+        -->
+        <group id="Go.TestCoverageContextGroup"
+               class="com.github.themirachathumina.golangintellijcommunity.run.test.coverage.GoTestCoverageContextGroup">
+            <add-to-group group-id="RunContextGroupMore" anchor="first"/>
+        </group>
+    </actions>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Program runner that enables "Run with Coverage" for Go test configurations -->
         <programRunner

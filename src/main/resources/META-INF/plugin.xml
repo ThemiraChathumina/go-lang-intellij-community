@@ -19,6 +19,8 @@
                 serviceImplementation="com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings"/>
         <projectService
                 serviceImplementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestResultsService"/>
+        <consoleFilterProvider
+                implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoConsoleFilterProvider"/>
         <applicationConfigurable
                 parentId="language"
                 instance="com.github.themirachathumina.golangintellijcommunity.settings.GoLanguageConfigurable"
@@ -112,6 +114,26 @@
     </extensions>
 
     <actions>
+        <!--
+          "Run" submenu shown in the editor right-click → Run section when multiple Go test
+          configurations match the current context (e.g. both gotest and gobench apply).
+          Hidden when there are 0 or 1 matching configurations so the normal platform
+          "Run '...'" action handles the single-config case unchanged.
+        -->
+        <group id="Go.TestRunContextGroup"
+               class="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunContextGroup">
+            <add-to-group group-id="RunContextGroupInner" anchor="before" relative-to-action="RunContextGroupMore"/>
+        </group>
+
+        <!--
+          "Modify Run Configuration" submenu inside the "More run/debug" section of the editor
+          right-click menu. Shown when multiple Go test configurations match the context.
+        -->
+        <group id="Go.TestModifyRunContextGroup"
+               class="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestModifyRunContextGroup">
+            <add-to-group group-id="RunContextGroupMore" anchor="last"/>
+        </group>
+
         <action id="Go.NewGoFile"
                 class="com.github.themirachathumina.golangintellijcommunity.ide.actions.GoCreateFileAction">
             <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>

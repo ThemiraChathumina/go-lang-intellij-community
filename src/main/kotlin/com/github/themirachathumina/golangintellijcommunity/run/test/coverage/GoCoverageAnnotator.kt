@@ -5,7 +5,7 @@ import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.SimpleCoverageAnnotator
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import java.io.File
@@ -36,18 +36,28 @@ class GoCoverageAnnotator(private val project: Project) : SimpleCoverageAnnotato
     // SimpleCoverageAnnotator hooks
     // -------------------------------------------------------------------------
 
-    override fun fillInfoForUncoveredFile(file: File): FileCoverageInfo = FileCoverageInfo()
+    // Return null so files NOT present in the coverage profile are never annotated.
+    override fun fillInfoForUncoveredFile(file: File): FileCoverageInfo? = null
 
     override fun shouldCollectCoverageInsideLibraryDirs(): Boolean = false
 
+    // Only return the immediate parent directories of files that actually have coverage
+    // data.  SimpleCoverageAnnotator scans all files under the returned roots, so
+    // returning the whole project root would annotate every .go file in the project.
     override fun getRoots(
         project: Project,
         dataManager: CoverageDataManager,
         suite: CoverageSuitesBundle
     ): Array<VirtualFile> =
-        dataManager.doInReadActionIfProjectOpen<Array<VirtualFile>> {
-            ProjectRootManager.getInstance(project).contentRoots
-        } ?: VirtualFile.EMPTY_ARRAY
+        dataManager.doInReadActionIfProjectOpen {
+            val basePath = project.basePath ?: return@doInReadActionIfProjectOpen emptyArray()
+            val stats = GoCoverageRunner.getAllStmtStats(basePath) ?: return@doInReadActionIfProjectOpen emptyArray()
+            val lfs = LocalFileSystem.getInstance()
+            stats.keys
+                .mapNotNull { path -> lfs.findFileByPath(path)?.parent }
+                .distinctBy { it.path }
+                .toTypedArray()
+        } ?: emptyArray()
 
     // -------------------------------------------------------------------------
     // Statement-percentage display — Project view (PsiFile variant)
@@ -57,10 +67,7 @@ class GoCoverageAnnotator(private val project: Project) : SimpleCoverageAnnotato
         psiFile: PsiFile,
         bundle: CoverageSuitesBundle,
         manager: CoverageDataManager
-    ): String? {
-        val path = psiFile.virtualFile?.path ?: return super.getFileCoverageInformationString(psiFile, bundle, manager)
-        return stmtString(path) ?: super.getFileCoverageInformationString(psiFile, bundle, manager)
-    }
+    ): String? = stmtString(psiFile.virtualFile?.path ?: return null)
 
     // -------------------------------------------------------------------------
     // Statement-percentage display — Coverage tool window (VirtualFile variant)
@@ -71,9 +78,7 @@ class GoCoverageAnnotator(private val project: Project) : SimpleCoverageAnnotato
         file: VirtualFile,
         bundle: CoverageSuitesBundle,
         manager: CoverageDataManager
-    ): String? =
-        stmtString(file.path)
-            ?: super.getFileCoverageInformationString(project, file, bundle, manager)
+    ): String? = stmtString(file.path)
 
     override fun getDirCoverageInformationString(
         project: Project,
@@ -81,17 +86,25 @@ class GoCoverageAnnotator(private val project: Project) : SimpleCoverageAnnotato
         bundle: CoverageSuitesBundle,
         manager: CoverageDataManager
     ): String? {
-        val basePath = project.basePath
-            ?: return super.getDirCoverageInformationString(project, dir, bundle, manager)
+        val basePath = project.basePath ?: return null
         val prefix = dir.path + "/"
-        val all = GoCoverageRunner.getAllStmtStats(basePath)
-            ?: return super.getDirCoverageInformationString(project, dir, bundle, manager)
+        val all = GoCoverageRunner.getAllStmtStats(basePath) ?: return null
 
-        var covered = 0; var total = 0
+        // A file counts as "covered" when at least one of its statements was executed.
+        var coveredFiles = 0; var totalFiles = 0
+        var coveredStmts = 0; var totalStmts = 0
         for ((filePath, stats) in all) {
-            if (filePath.startsWith(prefix)) { covered += stats.covered; total += stats.total }
+            if (filePath.startsWith(prefix)) {
+                totalFiles++
+                if (stats.covered > 0) coveredFiles++
+                coveredStmts += stats.covered
+                totalStmts  += stats.total
+            }
         }
-        return if (total == 0) null else formatStmt(covered, total)
+        if (totalFiles == 0) return null
+        val filesPct  = coveredFiles * 100 / totalFiles
+        val stmtsPct  = if (totalStmts > 0) coveredStmts * 100 / totalStmts else 0
+        return "$filesPct% files, $stmtsPct% statements"
     }
 
     // -------------------------------------------------------------------------

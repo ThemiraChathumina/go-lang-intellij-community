@@ -25,6 +25,8 @@ class GoFuzzRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
         val file = element.containingFile as? GoFile ?: return false
 
         if (!file.name.endsWith("_test.go")) return false
+        if (GoTestProducerGate.shouldSuppress(file, element)) return false
+
         val virtualFile = file.virtualFile ?: return false
         val packageDir = virtualFile.parent.path
 
@@ -46,9 +48,20 @@ class GoFuzzRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
             return true
         }
 
-        // We explicitly return false here so this producer does NOT trigger on files.
-        // This prevents `-fuzz` actions from cluttering the file-level Run submenu.
-        return false
+        // If inside a non-fuzz function don't fall through to file-scope
+        if (function != null) return false
+
+        // File-scope: offer "go test -fuzz <file>" when the file contains fuzz functions
+        val allFunctions = PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java)
+        if (allFunctions.none { isFuzzFunction(it) }) return false
+
+        config.testKind = GoTestKind.FUZZ
+        config.scope = GoTestScope.FILE
+        config.targetPath = virtualFile.path
+        config.workingDirectory = packageDir
+        config.name = "go test -fuzz ${file.name}"
+        sourceElement.set(file)
+        return true
     }
 
     override fun isConfigurationFromContext(
@@ -65,10 +78,16 @@ class GoFuzzRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
         val subtestInfo = GoTestRunConfigurationProducer.getSubtestInfo(element)
         if (subtestInfo != null) return false
 
+        val virtualFile = file.virtualFile ?: return false
+
         val function = PsiTreeUtil.getParentOfType(element, GoFunctionDecl::class.java)
         if (function != null && isFuzzFunction(function)) {
             val testName = function.functionName?.identifier?.text ?: return false
             return config.scope == GoTestScope.FUNCTION && config.targetPath == ".:$testName"
+        }
+
+        if (config.scope == GoTestScope.FILE) {
+            return config.targetPath == virtualFile.path
         }
 
         return false
