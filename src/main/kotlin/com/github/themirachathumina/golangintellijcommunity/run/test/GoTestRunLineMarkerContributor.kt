@@ -3,6 +3,7 @@ package com.github.themirachathumina.golangintellijcommunity.run.test
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionDecl
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionName
+import com.github.themirachathumina.golangintellijcommunity.psi.GoPackageName
 import com.intellij.coverage.CoverageExecutor
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.ProgramRunnerUtil
@@ -20,18 +21,35 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.execution.RunnerAndConfigurationSettings
 import com.intellij.psi.PsiElement
+import com.intellij.psi.util.PsiTreeUtil
+import javax.swing.Icon
 
 class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
     override fun getInfo(element: PsiElement): Info? {
         val file = element.containingFile
         if (!file.name.endsWith("_test.go")) return null
 
-        // 1. Gutter icon for Test / Benchmark / Fuzz Function Declarations
+        // 1. Package-level gutter icon — on the package name identifier of a test file.
+        //    Shows aggregate pass/fail status for the whole file; actions cover run, coverage, modify.
+        if (element.parent is GoPackageName) {
+            val allFunctions = PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java)
+            val hasAny = allFunctions.any {
+                GoTestRunConfigurationProducer.isTestFunction(it) ||
+                GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it)
+            }
+            if (!hasAny) return null
+            return createFileInfo(element)
+        }
+
+        // 2. Gutter icon for Test / Benchmark / Fuzz Function Declarations
         val parent = element.parent
         if (parent is GoFunctionName) {
             val function = parent.parent as? GoFunctionDecl ?: return null
             val testName = function.functionName?.identifier?.text ?: return null
+
+            if (testName == "TestMain") return null
 
             return when {
                 GoFuzzRunConfigurationProducer.isFuzzFunction(function) ->
@@ -108,6 +126,167 @@ class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
         val modifyGroup = FuzzModifyGroup(fuzzName, project, packageDir)
 
         return Info(icon, { fuzzName }, runGroup, coverGroup, modifyGroup)
+    }
+
+    /**
+     * File-level gutter icon shown next to the `package` keyword of a `*_test.go` file.
+     * Uses [AllIcons.Actions.RunAll] (the "fast-forward / >>" icon) as the default so it
+     * is visually distinct from individual function icons.  Reflects the aggregate result
+     * of all test functions in the file once tests have been run.
+     */
+    /**
+     * Builds the [Info] for the package-level gutter icon.
+     *
+     * We do NOT use [ExecutorAction.getActions] here because when a file contains
+     * multiple test kinds (e.g. Test + Benchmark), the platform's ConfigurationContext
+     * returns multiple matching configs and disables the executor actions.
+     *
+     * When only one test kind is present → flat Run / Coverage / Modify actions.
+     * When multiple kinds are present    → Run ▶, Run with Coverage ▶, Modify ▶ submenus,
+     *                                       each child targeting one specific kind.
+     */
+    private fun createFileInfo(element: PsiElement): Info {
+        val file = element.containingFile
+        val filePath = file.virtualFile?.path ?: return Info(AllIcons.Actions.RunAll, { file.name })
+        val packageDir = file.virtualFile!!.parent.path
+        val fileName = file.name
+        val project = element.project
+
+        val allFunctions = PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java)
+        val hasTests = allFunctions.any { fn ->
+            val name = fn.functionName?.identifier?.text ?: return@any false
+            name.startsWith("Test") && name != "TestMain"
+        }
+        val hasBenchmarks = allFunctions.any { GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it) }
+        val hasFuzz       = allFunctions.any { GoFuzzRunConfigurationProducer.isFuzzFunction(it) }
+
+        // (kind, config name matching the producer's naming convention)
+        // When fuzz functions are present, always include a TEST entry so the user can run
+        // them as ordinary unit tests (go test -run) in addition to fuzzing (go test -fuzz).
+        val kinds: List<Pair<GoTestKind, String>> = buildList {
+            if (hasTests || hasFuzz) add(GoTestKind.TEST      to fileName)
+            if (hasBenchmarks)       add(GoTestKind.BENCHMARK to "gobench $fileName...")
+            if (hasFuzz)             add(GoTestKind.FUZZ      to "go test -fuzz $fileName")
+        }
+
+        val registry    = ExecutorRegistry.getInstance()
+        val runExec     = registry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)
+        val coverExec   = registry.getExecutorById(CoverageExecutor.EXECUTOR_ID)
+
+        if (kinds.size <= 1) {
+            // Single kind → flat actions
+            val kind = kinds.firstOrNull()?.first ?: GoTestKind.TEST
+            val label = kinds.firstOrNull()?.second ?: fileName
+            val actions = buildList {
+                runExec?.let   { add(FileTestExecuteAction("Run '$label'",                label, filePath, packageDir, project, kind, it.id, it.icon)) }
+                coverExec?.let { add(FileTestExecuteAction("Run '$label' with Coverage", label, filePath, packageDir, project, kind, it.id, it.icon)) }
+                add(FileTestModifyAction("Modify Run Configuration\u2026", label, filePath, packageDir, project, kind, AllIcons.Actions.EditSource))
+            }
+            return Info(AllIcons.Actions.RunAll, { fileName }, *actions.toTypedArray())
+        }
+
+        // Multiple kinds → submenus
+        val actions = buildList<AnAction> {
+            runExec?.let { exec ->
+                add(object : ActionGroup("Run", true) {
+                    init { templatePresentation.icon = exec.icon }
+                    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+                    override fun getChildren(e: AnActionEvent?) = kinds.map { (kind, label) ->
+                        FileTestExecuteAction(label, label, filePath, packageDir, project, kind, exec.id, GoIcons.FILE)
+                    }.toTypedArray()
+                })
+            }
+            coverExec?.let { exec ->
+                add(object : ActionGroup("Run with Coverage", true) {
+                    init { templatePresentation.icon = exec.icon }
+                    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+                    override fun getChildren(e: AnActionEvent?) = kinds.map { (kind, label) ->
+                        FileTestExecuteAction(label, label, filePath, packageDir, project, kind, exec.id, GoIcons.FILE)
+                    }.toTypedArray()
+                })
+            }
+            add(object : ActionGroup("Modify Run Configuration\u2026", true) {
+                init { templatePresentation.icon = AllIcons.Actions.EditSource }
+                override fun getActionUpdateThread() = ActionUpdateThread.BGT
+                override fun getChildren(e: AnActionEvent?) = kinds.map { (kind, label) ->
+                    FileTestModifyAction(label, label, filePath, packageDir, project, kind)
+                }.toTypedArray()
+            })
+        }
+        return Info(AllIcons.Actions.RunAll, { fileName }, *actions.toTypedArray())
+    }
+
+    private class FileTestExecuteAction(
+        name: String,
+        private val configName: String,
+        private val filePath: String,
+        private val packageDir: String,
+        private val project: Project,
+        private val testKind: GoTestKind,
+        private val executorId: String,
+        icon: Icon
+    ) : AnAction(name.replace("_", "__"), null, icon) {
+        override fun getActionUpdateThread() = ActionUpdateThread.BGT
+        override fun actionPerformed(e: AnActionEvent) {
+            val executor = ExecutorRegistry.getInstance().getExecutorById(executorId) ?: return
+            ProgramRunnerUtil.executeConfiguration(findOrCreateConfig(), executor)
+        }
+
+        private fun findOrCreateConfig(): RunnerAndConfigurationSettings {
+            val runManager = RunManager.getInstance(project)
+            return runManager.allSettings.firstOrNull { s ->
+                val c = s.configuration
+                c is GoTestRunConfiguration && c.scope == GoTestScope.FILE &&
+                        c.targetPath == filePath && c.testKind == testKind
+            } ?: run {
+                val factory = ConfigurationTypeUtil
+                    .findConfigurationType(GoTestRunConfigurationType::class.java)
+                    .configurationFactories[0]
+                runManager.createConfiguration(configName, factory).also { s ->
+                    (s.configuration as GoTestRunConfiguration).apply {
+                        this.testKind = testKind
+                        scope         = GoTestScope.FILE
+                        targetPath    = filePath
+                        workingDirectory = packageDir
+                        name          = configName
+                    }
+                }
+            }
+        }
+    }
+
+    private class FileTestModifyAction(
+        name: String,
+        private val configName: String,
+        private val filePath: String,
+        private val packageDir: String,
+        private val project: Project,
+        private val testKind: GoTestKind,
+        icon: Icon = GoIcons.FILE
+    ) : AnAction(name.replace("_", "__"), null, icon) {
+        override fun getActionUpdateThread() = ActionUpdateThread.BGT
+        override fun actionPerformed(e: AnActionEvent) {
+            val runManager = RunManager.getInstance(project)
+            val settings = runManager.allSettings.firstOrNull { s ->
+                val c = s.configuration
+                c is GoTestRunConfiguration && c.scope == GoTestScope.FILE &&
+                        c.targetPath == filePath && c.testKind == testKind
+            } ?: run {
+                val factory = ConfigurationTypeUtil
+                    .findConfigurationType(GoTestRunConfigurationType::class.java)
+                    .configurationFactories[0]
+                runManager.createConfiguration(configName, factory).also { s ->
+                    (s.configuration as GoTestRunConfiguration).apply {
+                        this.testKind = testKind
+                        scope         = GoTestScope.FILE
+                        targetPath    = filePath
+                        workingDirectory = packageDir
+                        name          = configName
+                    }
+                }
+            }
+            RunDialog.editConfiguration(project, settings, "Edit configuration")
+        }
     }
 
     /**

@@ -53,12 +53,16 @@ object GoTestProducerGate {
         }
         val hasFuzz       = functions.any { GoFuzzRunConfigurationProducer.isFuzzFunction(it) }
         val hasBenchmarks = functions.any { GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it) }
-        return listOf(hasNonFuzzTests, hasFuzz, hasBenchmarks).count { it } >= 2
+        // Also suppress when fuzz functions exist at file level even without other kinds:
+        // GoTestRunConfigurationProducer always matches fuzz functions (isTestFunction = true),
+        // so fuzz-only files always yield 2 matching configs (TEST + FUZZ), causing both a
+        // flat action and the context-group submenu to appear simultaneously.
+        return hasFuzz || listOf(hasNonFuzzTests, hasBenchmarks).count { it } >= 2
     }
 
     /**
      * Returns true when producers should suppress themselves for a directory right-click.
-     * Same 2+ kinds logic as [shouldSuppress] but scans the whole directory tree.
+     * Same logic as [shouldSuppress] but scans the whole directory tree.
      */
     fun shouldSuppressDirectory(dir: PsiDirectory): Boolean {
         if (isBypassed()) return false
@@ -68,7 +72,7 @@ object GoTestProducerGate {
         }
         val hasFuzz       = functions.any { GoFuzzRunConfigurationProducer.isFuzzFunction(it) }
         val hasBenchmarks = functions.any { GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it) }
-        return listOf(hasNonFuzzTests, hasFuzz, hasBenchmarks).count { it } >= 2
+        return hasFuzz || listOf(hasNonFuzzTests, hasBenchmarks).count { it } >= 2
     }
 
     /**

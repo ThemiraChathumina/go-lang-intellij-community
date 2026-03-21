@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.search.scope.packageSet.CustomScopesProvider
 import com.intellij.psi.search.scope.packageSet.FilePatternPackageSet
 import com.intellij.psi.search.scope.packageSet.NamedScope
+import com.intellij.psi.search.scope.packageSet.UnionPackageSet
 
 class GoFileScopesProvider(private val project: Project) : CustomScopesProvider {
 
@@ -13,7 +14,13 @@ class GoFileScopesProvider(private val project: Project) : CustomScopesProvider 
     }
 
     override fun getCustomScopes(): List<NamedScope> = listOf(
-        NamedScope(TEST_FILES_SCOPE, FilePatternPackageSet(null, "**/*_test.go")),
-        NamedScope(SUM_FILE_SCOPE,   FilePatternPackageSet(null, "**/go.sum"))
+        NamedScope(TEST_FILES_SCOPE, UnionPackageSet.create(
+            FilePatternPackageSet(null, "*_test.go"),
+            FilePatternPackageSet(null, "**/*_test.go")
+        )),
+        NamedScope(SUM_FILE_SCOPE, UnionPackageSet.create(
+            FilePatternPackageSet(null, "go.sum"),
+            FilePatternPackageSet(null, "**/go.sum")
+        ))
     )
 }
