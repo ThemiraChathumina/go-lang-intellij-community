@@ -1,10 +1,15 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.intellij.coverage.CoverageExecutor
 import com.intellij.execution.ExecutionException
+import com.intellij.execution.ExecutionResult
+import com.intellij.execution.Executor
 import com.intellij.execution.configurations.CommandLineState
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
 import com.intellij.execution.process.*
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.runners.ProgramRunner
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Ref
@@ -22,11 +27,24 @@ class GoRunProfileState(
     private val config: GoRunConfiguration
 ) : CommandLineState(env) {
 
+    @Volatile private var coverageDir: String? = null
+
+    override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult {
+        if (executor is CoverageExecutor) {
+            // Initialise the coverage config early so the suite is registered before the process starts.
+            CoverageEnabledConfiguration.getOrCreate(config)
+            val tempDir = FileUtil.createTempDirectory("go_covdir_", null, true)
+            coverageDir = tempDir.absolutePath
+            environment.putUserData(GO_COVERAGE_DIR_KEY, tempDir.absolutePath)
+        }
+        return super.execute(executor, runner)
+    }
+
     override fun startProcess(): ProcessHandler {
-        // Use build result from before-run task if available,
-        // otherwise build now with a modal progress dialog (runs off EDT)
-        val buildResult = environment.getUserData(GO_BUILD_RESULT_KEY)
-            ?: buildWithProgress()
+        // For coverage runs, always rebuild with -cover instrumentation.
+        // Otherwise use the before-run task result or build now.
+        val buildResult = if (coverageDir != null) buildWithProgress(withCoverage = true)
+                          else environment.getUserData(GO_BUILD_RESULT_KEY) ?: buildWithProgress()
 
         val outputExe = buildResult.exePath
 
@@ -46,6 +64,8 @@ class GoRunProfileState(
         // Forward environment variables to the run command
         val envVars = runCmd.environment
         envVars.putAll(config.envVariables)
+        // Coverage: tell the instrumented binary where to write coverage data
+        coverageDir?.let { envVars["GOCOVERDIR"] = FileUtil.toSystemDependentName(it) }
         if (config.goOS.isNotEmpty()) envVars["GOOS"] = config.goOS
         if (config.goArch.isNotEmpty()) envVars["GOARCH"] = config.goArch
         envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
@@ -71,22 +91,22 @@ class GoRunProfileState(
     }
 
     /**
-     * Fallback: runs the build on a pooled thread with a modal progress dialog.
-     * Used when the GoBuildBeforeRunTask is not present in the configuration.
+     * Runs the build on a pooled thread with a modal progress dialog.
+     * Pass [withCoverage] = true to instrument the binary for coverage collection.
      */
-    private fun buildWithProgress(): GoBuildResult {
+    private fun buildWithProgress(withCoverage: Boolean = false): GoBuildResult {
         val resultRef = Ref<GoBuildResult>()
         val errorRef = Ref<Exception>()
 
         ProgressManager.getInstance().runProcessWithProgressSynchronously(
             {
                 try {
-                    resultRef.set(buildGoApplication(config))
+                    resultRef.set(buildGoApplication(config, withCoverage = withCoverage))
                 } catch (e: Exception) {
                     errorRef.set(e)
                 }
             },
-            "Compiling Go program...",
+            if (withCoverage) "Compiling Go program with coverage..." else "Compiling Go program...",
             true,
             environment.project
         )

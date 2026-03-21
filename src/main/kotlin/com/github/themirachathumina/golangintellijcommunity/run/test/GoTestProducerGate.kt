@@ -2,6 +2,7 @@ package com.github.themirachathumina.golangintellijcommunity.run.test
 
 import com.github.themirachathumina.golangintellijcommunity.GoFile
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionDecl
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -53,5 +54,37 @@ object GoTestProducerGate {
         val hasFuzz       = functions.any { GoFuzzRunConfigurationProducer.isFuzzFunction(it) }
         val hasBenchmarks = functions.any { GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it) }
         return listOf(hasNonFuzzTests, hasFuzz, hasBenchmarks).count { it } >= 2
+    }
+
+    /**
+     * Returns true when producers should suppress themselves for a directory right-click.
+     * Same 2+ kinds logic as [shouldSuppress] but scans the whole directory tree.
+     */
+    fun shouldSuppressDirectory(dir: PsiDirectory): Boolean {
+        if (isBypassed()) return false
+        val functions = getTestFunctionsInDirectory(dir)
+        val hasNonFuzzTests = functions.any {
+            GoTestRunConfigurationProducer.isTestFunction(it) && !GoFuzzRunConfigurationProducer.isFuzzFunction(it)
+        }
+        val hasFuzz       = functions.any { GoFuzzRunConfigurationProducer.isFuzzFunction(it) }
+        val hasBenchmarks = functions.any { GoBenchmarkRunConfigurationProducer.isBenchmarkFunction(it) }
+        return listOf(hasNonFuzzTests, hasFuzz, hasBenchmarks).count { it } >= 2
+    }
+
+    /**
+     * Recursively collects all [GoFunctionDecl] nodes from `*_test.go` files
+     * within [dir] and all its subdirectories.
+     */
+    fun getTestFunctionsInDirectory(dir: PsiDirectory): List<GoFunctionDecl> {
+        val result = mutableListOf<GoFunctionDecl>()
+        for (file in dir.files) {
+            if (file is GoFile && file.name.endsWith("_test.go")) {
+                result.addAll(PsiTreeUtil.findChildrenOfType(file, GoFunctionDecl::class.java))
+            }
+        }
+        for (sub in dir.subdirectories) {
+            result.addAll(getTestFunctionsInDirectory(sub))
+        }
+        return result
     }
 }

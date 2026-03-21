@@ -127,7 +127,7 @@
 
         <!--
           "Modify Run Configuration" submenu inside the "More run/debug" section of the editor
-          right-click menu. Shown when multiple Go test configurations match the context.
+          right-click menu. Shown when multiple Go configurations match the current context.
         -->
         <group id="Go.TestModifyRunContextGroup"
                class="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestModifyRunContextGroup">

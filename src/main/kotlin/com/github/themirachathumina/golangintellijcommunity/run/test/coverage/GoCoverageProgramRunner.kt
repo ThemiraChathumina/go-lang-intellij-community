@@ -1,14 +1,20 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
+import com.github.themirachathumina.golangintellijcommunity.run.GO_COVERAGE_DIR_KEY
+import com.github.themirachathumina.golangintellijcommunity.run.GoRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageExecutor
 import com.intellij.coverage.CoverageRunnerData
 import com.intellij.execution.configurations.ConfigurationInfoProvider
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.RunnerSettings
 import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
+import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -16,6 +22,7 @@ import com.intellij.execution.runners.GenericProgramRunner
 import com.intellij.execution.runners.RunContentBuilder
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.newvfs.RefreshQueue
 import java.io.File
@@ -34,7 +41,8 @@ class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     override fun getRunnerId(): String = "GoCoverageProgramRunner"
 
     override fun canRun(executorId: String, profile: RunProfile): Boolean =
-        executorId == CoverageExecutor.EXECUTOR_ID && profile is GoTestRunConfiguration
+        executorId == CoverageExecutor.EXECUTOR_ID &&
+        (profile is GoTestRunConfiguration || profile is GoRunConfiguration)
 
     override fun createConfigurationData(settingsProvider: ConfigurationInfoProvider): RunnerSettings {
         return CoverageRunnerData()
@@ -56,15 +64,55 @@ class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     }
 
     private fun processCoverage(env: ExecutionEnvironment) {
-        val runConfig = env.runProfile as? GoTestRunConfiguration ?: return
+        when (val profile = env.runProfile) {
+            is GoTestRunConfiguration -> processTestCoverage(env, profile)
+            is GoRunConfiguration     -> processRunCoverage(env, profile)
+        }
+    }
+
+    private fun processTestCoverage(env: ExecutionEnvironment, runConfig: GoTestRunConfiguration) {
+        val coverageConfig = CoverageEnabledConfiguration.getOrCreate(runConfig)
+        val pathStr = coverageConfig.coverageFilePath ?: return
+        refreshAndProcess(env, runConfig, pathStr)
+    }
+
+    /**
+     * For [GoRunConfiguration], the binary was built with `-cover` and ran with `GOCOVERDIR`
+     * pointing to a temp directory. Convert that raw coverage data to the standard
+     * `go test` coverprofile format using `go tool covdata textfmt`, then process normally.
+     */
+    private fun processRunCoverage(env: ExecutionEnvironment, runConfig: GoRunConfiguration) {
+        val coverageDir  = env.getUserData(GO_COVERAGE_DIR_KEY) ?: return
         val coverageConfig = CoverageEnabledConfiguration.getOrCreate(runConfig)
         val pathStr = coverageConfig.coverageFilePath ?: return
 
-        val path = Paths.get(pathStr)
+        // Conversion is blocking — dispatch to a pooled thread so we don't block the EDT.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val sdkPath = GoProjectSettings.getInstance(runConfig.project).state.goSdkPath
+            val goExe   = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return@executeOnPooledThread
+            val cmd = GeneralCommandLine(
+                FileUtil.toSystemDependentName(goExe),
+                "tool", "covdata", "textfmt",
+                "-i=${FileUtil.toSystemDependentName(coverageDir)}",
+                "-o=${FileUtil.toSystemDependentName(pathStr)}"
+            )
+            CapturingProcessHandler(cmd).runProcess()
+
+            ApplicationManager.getApplication().invokeLater {
+                refreshAndProcess(env, runConfig, pathStr)
+            }
+        }
+    }
+
+    private fun refreshAndProcess(
+        env: ExecutionEnvironment,
+        runConfig: com.intellij.execution.configurations.RunConfigurationBase<*>,
+        pathStr: String
+    ) {
+        val path   = Paths.get(pathStr)
         val parent = path.parent ?: return
 
         // findFileByNioFile is a cache-only lookup — no disk I/O on EDT.
-        // The parent directory (e.g. system temp) is virtually always already in VFS.
         val parentVFile = LocalFileSystem.getInstance().findFileByNioFile(parent)
 
         val afterRefresh = Runnable {
@@ -78,10 +126,8 @@ class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         }
 
         if (parentVFile != null) {
-            // Async refresh: disk scan happens off-EDT; afterRefresh runs on EDT when done.
             RefreshQueue.getInstance().refresh(true, true, afterRefresh, parentVFile)
         } else {
-            // Parent not yet in VFS — fall back to running directly on a background thread.
             ApplicationManager.getApplication().executeOnPooledThread {
                 LocalFileSystem.getInstance().refreshAndFindFileByNioFile(parent)
                 ApplicationManager.getApplication().invokeLater(afterRefresh)

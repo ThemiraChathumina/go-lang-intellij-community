@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestProducerGate
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.LazyRunConfigurationProducer
 import com.intellij.execution.configurations.ConfigurationFactory
@@ -28,6 +29,12 @@ class GoPackageRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConf
             is PsiDirectory -> location
             else -> location.containingFile?.containingDirectory ?: return false
         }
+
+        // When right-clicking a directory that also has test functions, the test context
+        // groups take over and include the run config inside their submenus. Suppress the
+        // flat "Run package" action so it doesn't appear as a duplicate alongside the submenus.
+        if (location is PsiDirectory && !GoTestProducerGate.isBypassed()
+            && GoTestProducerGate.shouldSuppressDirectory(directory)) return false
 
         val mainFiles = directory.files.filter { GoRunAnalyzer.isMainPackage(it) }
 

@@ -27,7 +27,7 @@ class GoFileRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConfigu
         config.runKind = GoRunKind.FILE
         config.targetPath = virtualFile.path
         config.workingDirectory = virtualFile.parent.path
-        config.name = "Run ${file.name}"
+        config.name = file.name
 
         // --- CRITICAL FIX ---
         // Tell IntelliJ exactly what we clicked on so it can anchor the context menu

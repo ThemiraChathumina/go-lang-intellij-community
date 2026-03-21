@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
+import com.github.themirachathumina.golangintellijcommunity.run.GoRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
 import com.intellij.coverage.*
 import com.intellij.coverage.view.CoverageViewExtension
@@ -33,7 +34,7 @@ class GoCoverageEngine : CoverageEngine() {
     override fun getPresentableText(): String = "Go Coverage"
 
     override fun isApplicableTo(conf: RunConfigurationBase<*>): Boolean =
-        conf is GoTestRunConfiguration
+        conf is GoTestRunConfiguration || conf is GoRunConfiguration
 
     override fun createCoverageEnabledConfiguration(
         conf: RunConfigurationBase<*>

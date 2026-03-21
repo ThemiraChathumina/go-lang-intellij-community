@@ -27,6 +27,7 @@ data class GoBuildResult(
 )
 
 val GO_BUILD_RESULT_KEY: Key<GoBuildResult> = Key.create("GoBuildResult")
+val GO_COVERAGE_DIR_KEY: Key<String> = Key.create("GoCoverageDir")
 
 /**
  * Builds a Go application from the given run configuration.
@@ -50,7 +51,7 @@ private fun deriveBinaryName(config: GoRunConfiguration): String {
     return if (SystemInfo.isWindows) "$base.exe" else base
 }
 
-fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
+fun buildGoApplication(config: GoRunConfiguration, withCoverage: Boolean = false): GoBuildResult {
     val sdkPath = GoProjectSettings.getInstance(config.project).state.goSdkPath
     val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
         ?: throw ExecutionException("Go SDK is not configured for this project.")
@@ -72,6 +73,12 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
 
     val buildCmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "build", "-o", outputExe)
 
+    if (withCoverage) {
+        buildCmd.addParameter("-cover")
+        buildCmd.addParameter("-coverpkg=./...")
+        buildCmd.addParameter("-covermode=atomic")
+    }
+
     if (config.goToolArguments.isNotEmpty()) {
         buildCmd.parametersList.addParametersString(config.goToolArguments)
     }
@@ -89,7 +96,16 @@ fun buildGoApplication(config: GoRunConfiguration): GoBuildResult {
         buildCmd.addParameter("-gcflags=$gcFlags")
     }
 
-    buildCmd.addParameter(FileUtil.toSystemDependentName(config.targetPath))
+    // For coverage builds of a single file, build the whole package directory instead.
+    // Passing a specific .go file creates an ad-hoc package where -coverpkg=./... doesn't
+    // expand properly, resulting in empty coverage data.
+    val buildTarget = if (withCoverage && config.runKind == GoRunKind.FILE) {
+        val targetFile = File(FileUtil.toSystemDependentName(config.targetPath))
+        FileUtil.toSystemDependentName(targetFile.parent ?: config.targetPath)
+    } else {
+        FileUtil.toSystemDependentName(config.targetPath)
+    }
+    buildCmd.addParameter(buildTarget)
     buildCmd.withWorkDirectory(FileUtil.toSystemDependentName(config.workingDirectory))
 
     val envVars = buildCmd.environment

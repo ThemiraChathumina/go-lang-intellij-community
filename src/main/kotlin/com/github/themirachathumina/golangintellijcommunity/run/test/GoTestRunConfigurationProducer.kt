@@ -7,6 +7,7 @@ import com.intellij.execution.actions.LazyRunConfigurationProducer
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.openapi.util.Ref
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -22,6 +23,24 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
     ): Boolean {
         val location = context.location ?: return false
         val element = location.psiElement
+
+        // Handle directory right-click (project view folder or package node)
+        if (element is PsiDirectory) {
+            if (GoTestProducerGate.shouldSuppressDirectory(element)) return false
+            val functions = GoTestProducerGate.getTestFunctionsInDirectory(element)
+            val hasTests = functions.any {
+                isTestFunction(it) && !GoFuzzRunConfigurationProducer.isFuzzFunction(it)
+            }
+            if (!hasTests) return false
+            config.testKind         = GoTestKind.TEST
+            config.scope            = GoTestScope.DIRECTORY
+            config.targetPath       = element.virtualFile.path
+            config.workingDirectory = element.virtualFile.path
+            config.name             = "gotest ${element.name}"
+            sourceElement.set(element)
+            return true
+        }
+
         val file = element.containingFile as? GoFile ?: return false
 
         if (!file.name.endsWith("_test.go")) return false
@@ -94,6 +113,12 @@ class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunCon
 
         val location = context.location ?: return false
         val element = location.psiElement
+
+        if (element is PsiDirectory) {
+            return config.scope == GoTestScope.DIRECTORY &&
+                   config.targetPath == element.virtualFile.path
+        }
+
         val file = element.containingFile as? GoFile ?: return false
         if (!file.name.endsWith("_test.go")) return false
         val virtualFile = file.virtualFile ?: return false

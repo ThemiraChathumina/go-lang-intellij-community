@@ -7,6 +7,7 @@ import com.intellij.execution.actions.LazyRunConfigurationProducer
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.openapi.util.Ref
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -22,6 +23,20 @@ class GoBenchmarkRunConfigurationProducer : LazyRunConfigurationProducer<GoTestR
     ): Boolean {
         val location = context.location ?: return false
         val element = location.psiElement
+
+        if (element is PsiDirectory) {
+            if (GoTestProducerGate.shouldSuppressDirectory(element)) return false
+            val functions = GoTestProducerGate.getTestFunctionsInDirectory(element)
+            if (functions.none { isBenchmarkFunction(it) }) return false
+            config.testKind         = GoTestKind.BENCHMARK
+            config.scope            = GoTestScope.DIRECTORY
+            config.targetPath       = element.virtualFile.path
+            config.workingDirectory = element.virtualFile.path
+            config.name             = "gobench ${element.name}"
+            sourceElement.set(element)
+            return true
+        }
+
         val file = element.containingFile as? GoFile ?: return false
 
         if (!file.name.endsWith("_test.go")) return false
@@ -81,6 +96,12 @@ class GoBenchmarkRunConfigurationProducer : LazyRunConfigurationProducer<GoTestR
 
         val location = context.location ?: return false
         val element = location.psiElement
+
+        if (element is PsiDirectory) {
+            return config.scope == GoTestScope.DIRECTORY &&
+                   config.targetPath == element.virtualFile.path
+        }
+
         val file = element.containingFile as? GoFile ?: return false
         if (!file.name.endsWith("_test.go")) return false
         val virtualFile = file.virtualFile ?: return false

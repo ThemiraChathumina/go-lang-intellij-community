@@ -2,8 +2,10 @@ package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionDecl
+import com.github.themirachathumina.golangintellijcommunity.run.GoPackageRunConfigurationProducer
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoBenchmarkRunConfigurationProducer
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoFuzzRunConfigurationProducer
+import com.intellij.psi.PsiDirectory
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestKind
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestProducerGate
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
@@ -48,6 +50,19 @@ class GoTestCoverageContextGroup : ActionGroup(), DumbAware {
         val element  = context.location?.psiElement
         val project  = e.project
 
+        if (element is PsiDirectory) {
+            cachedFuzzInfo = null
+            if (!GoTestProducerGate.shouldSuppressDirectory(element)) {
+                cachedConfigs = emptyList()
+                e.presentation.isEnabledAndVisible = false
+                return
+            }
+            val configs = resolveTestConfigs(e)
+            cachedConfigs = configs
+            e.presentation.isEnabledAndVisible = configs.isNotEmpty()
+            return
+        }
+
         if (element != null && project != null) {
             val fn = PsiTreeUtil.getParentOfType(element, GoFunctionDecl::class.java)
             if (fn != null && GoFuzzRunConfigurationProducer.isFuzzFunction(fn)) {
@@ -79,9 +94,8 @@ class GoTestCoverageContextGroup : ActionGroup(), DumbAware {
 
         val configs = cachedConfigs
         return configs.map { fromContext ->
-            val config   = fromContext.configuration as GoTestRunConfiguration
             val settings = fromContext.configurationSettings
-            object : AnAction(config.name.replace("_", "__"), null, GoIcons.FILE) {
+            object : AnAction(settings.name.replace("_", "__"), null, GoIcons.FILE) {
                 override fun getActionUpdateThread() = ActionUpdateThread.BGT
                 override fun actionPerformed(e: AnActionEvent) {
                     val executor = ExecutorRegistry.getInstance()
@@ -121,9 +135,9 @@ class GoTestCoverageContextGroup : ActionGroup(), DumbAware {
             listOf(
                 GoTestRunConfigurationProducer(),
                 GoBenchmarkRunConfigurationProducer(),
-                GoFuzzRunConfigurationProducer()
+                GoFuzzRunConfigurationProducer(),
+                GoPackageRunConfigurationProducer()
             ).mapNotNull { it.findOrCreateConfigurationFromContext(context) }
-             .filter { it.configuration is GoTestRunConfiguration }
         }
     }
 }
