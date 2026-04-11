@@ -8,7 +8,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFile
-import com.intellij.openapi.application.runWriteAction
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiDocumentManager
 
 class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new Go file", GoIcons.FILE), DumbAware {
@@ -39,9 +39,9 @@ class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new G
         val directory = createdFile.containingDirectory ?: return
         val sanitizedPackage = sanitizePackageName(directory.name)
         
-        runWriteAction {
+        WriteCommandAction.runWriteCommandAction(project) {
             val documentManager = PsiDocumentManager.getInstance(project)
-            val document = documentManager.getDocument(createdFile) ?: return@runWriteAction
+            val document = documentManager.getDocument(createdFile) ?: return@runWriteCommandAction
             val text = document.text
             
             val oldPackagePrefix = "package "

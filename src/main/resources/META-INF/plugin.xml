@@ -114,6 +114,10 @@
 
         <customScopesProvider implementation="com.github.themirachathumina.golangintellijcommunity.ide.GoFileScopesProvider"/>
         <postStartupActivity implementation="com.github.themirachathumina.golangintellijcommunity.ide.GoFileColorStartupActivity"/>
+
+        <internalFileTemplate name="Go File"/>
+        <internalFileTemplate name="Go Main File"/>
+        <internalFileTemplate name="Go Test File"/>
     </extensions>
 
     <actions>
