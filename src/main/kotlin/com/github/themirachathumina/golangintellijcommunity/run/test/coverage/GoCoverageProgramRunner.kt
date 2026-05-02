@@ -1,6 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
 import com.github.themirachathumina.golangintellijcommunity.run.GO_COVERAGE_DIR_KEY
+import com.github.themirachathumina.golangintellijcommunity.run.GoCompilationStatusWidget
 import com.github.themirachathumina.golangintellijcommunity.run.GoRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
@@ -23,6 +24,7 @@ import com.intellij.execution.runners.RunContentBuilder
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.io.FileUtil
+import java.util.concurrent.atomic.AtomicReference
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.newvfs.RefreshQueue
 import java.io.File
@@ -49,11 +51,34 @@ class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     }
 
     override fun doExecute(state: RunProfileState, environment: ExecutionEnvironment): RunContentDescriptor? {
-        val executionResult = state.execute(environment.executor, this) ?: return null
+        val project = environment.project
+
+        // For test coverage runs, go test handles compilation internally so we show the widget
+        // for the full run duration. For GoRunConfiguration coverage, buildWithProgress already
+        // shows its own "Compiling Go program with coverage..." widget during the build phase.
+        val isTestRun = environment.runProfile is GoTestRunConfiguration
+        val destroyProcess = AtomicReference<(() -> Unit)?>(null)
+
+        if (isTestRun) {
+            GoCompilationStatusWidget.install(project, "Running Go tests with coverage...") {
+                destroyProcess.get()?.invoke()
+                GoCompilationStatusWidget.remove(project)
+            }
+        }
+
+        val executionResult = state.execute(environment.executor, this) ?: run {
+            if (isTestRun) GoCompilationStatusWidget.remove(project)
+            return null
+        }
         val handler = executionResult.processHandler
+
+        if (isTestRun) {
+            destroyProcess.set { handler.destroyProcess() }
+        }
 
         handler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
+                if (isTestRun) GoCompilationStatusWidget.remove(project)
                 ApplicationManager.getApplication().invokeLater {
                     processCoverage(environment)
                 }

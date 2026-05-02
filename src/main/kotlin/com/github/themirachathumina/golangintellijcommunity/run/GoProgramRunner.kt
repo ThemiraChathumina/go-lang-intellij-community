@@ -8,12 +8,12 @@ import com.intellij.execution.runners.AsyncProgramRunner
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.RunContentBuilder
 import com.intellij.execution.ui.RunContentDescriptor
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.progress.Task
 import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class GoProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 
@@ -25,42 +25,54 @@ class GoProgramRunner : AsyncProgramRunner<RunnerSettings>() {
     override fun execute(environment: ExecutionEnvironment, state: RunProfileState): Promise<RunContentDescriptor?> {
         val promise = AsyncPromise<RunContentDescriptor?>()
         val config = environment.runProfile as GoRunConfiguration
+        val project = environment.project
 
-        // Flush unsaved editor changes to disk so go build compiles the latest code
         FileDocumentManager.getInstance().saveAllDocuments()
 
-        ProgressManager.getInstance().run(object : Task.Backgroundable(
-            environment.project, "Compiling Go program...", true
-        ) {
-            override fun run(indicator: ProgressIndicator) {
-                indicator.isIndeterminate = true
-                val buildResult = buildGoApplication(config)
-                environment.putUserData(GO_BUILD_RESULT_KEY, buildResult)
-            }
+        val cancelled = AtomicBoolean(false)
+        val destroyBuild = AtomicReference<(() -> Unit)?>(null)
 
-            override fun onSuccess() {
-                try {
-                    val result = state.execute(environment.executor, this@GoProgramRunner)
-                    if (result != null) {
-                        val descriptor = RunContentBuilder(result, environment)
-                            .showRunContent(environment.contentToReuse)
-                        promise.setResult(descriptor)
-                    } else {
-                        promise.setResult(null)
-                    }
-                } catch (e: Exception) {
-                    promise.setError(e)
+        GoCompilationStatusWidget.install(project, "Compiling Go program...") {
+            cancelled.set(true)
+            destroyBuild.get()?.invoke()
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val buildResult = buildGoApplication(config) { handler ->
+                    destroyBuild.set { handler.destroyProcess() }
+                    // handle cancel arriving before handler was registered
+                    if (cancelled.get()) handler.destroyProcess()
                 }
-            }
 
-            override fun onCancel() {
-                promise.setResult(null)
-            }
+                GoCompilationStatusWidget.remove(project)
 
-            override fun onThrowable(error: Throwable) {
-                promise.setError(error)
+                if (cancelled.get()) {
+                    promise.setResult(null)
+                    return@executeOnPooledThread
+                }
+
+                environment.putUserData(GO_BUILD_RESULT_KEY, buildResult)
+
+                ApplicationManager.getApplication().invokeLater {
+                    try {
+                        val result = state.execute(environment.executor, this@GoProgramRunner)
+                        if (result != null) {
+                            val descriptor = RunContentBuilder(result, environment)
+                                .showRunContent(environment.contentToReuse)
+                            promise.setResult(descriptor)
+                        } else {
+                            promise.setResult(null)
+                        }
+                    } catch (e: Exception) {
+                        promise.setError(e)
+                    }
+                }
+            } catch (e: Exception) {
+                GoCompilationStatusWidget.remove(project)
+                if (cancelled.get()) promise.setResult(null) else promise.setError(e)
             }
-        })
+        }
 
         return promise
     }

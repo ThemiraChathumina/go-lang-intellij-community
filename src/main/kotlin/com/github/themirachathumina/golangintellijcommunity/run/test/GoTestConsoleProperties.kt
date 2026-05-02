@@ -22,6 +22,9 @@ class GoTestConsoleProperties(
         // All our service messages carry 'nodeId' / 'parentNodeId', so use the
         // id-based tree mode for precise parent-child placement.
         isIdBasedTestTree = true
+        // Show passed tests in the tree by default. The user can still toggle the
+        // filter button in the toolbar to hide them.
+        setIfUndefined(HIDE_PASSED_TESTS, false)
     }
 
     override fun getTestLocator(): SMTestLocator {

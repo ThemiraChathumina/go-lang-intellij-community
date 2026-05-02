@@ -187,5 +187,8 @@ sourceSets {
         java {
             srcDirs("src/main/gen")
         }
+        kotlin {
+            exclude("**/.claude/**")
+        }
     }
 }

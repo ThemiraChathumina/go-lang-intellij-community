@@ -57,6 +57,8 @@
 
         <newProjectWizard.generator implementation="com.github.themirachathumina.golangintellijcommunity.wizard.GoNewProjectWizard"/>
         <configurationType implementation="com.github.themirachathumina.golangintellijcommunity.run.GoRunConfigurationType"/>
+        <programRunner implementation="com.github.themirachathumina.golangintellijcommunity.run.GoProgramRunner"/>
+        <programRunner implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestProgramRunner"/>
         <configurationType implementation="com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfigurationType"/>
         <!-- LSP textDocument/signatureHelp -->
         <codeInsight.parameterInfo

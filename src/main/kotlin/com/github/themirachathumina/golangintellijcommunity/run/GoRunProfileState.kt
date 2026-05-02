@@ -10,9 +10,12 @@ import com.intellij.execution.configurations.coverage.CoverageEnabledConfigurati
 import com.intellij.execution.process.*
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Ref
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -90,29 +93,66 @@ class GoRunProfileState(
         return GoRunProcessHandler(buildResult, runCmd, config.timeoutSeconds)
     }
 
-    /**
-     * Runs the build on a pooled thread with a modal progress dialog.
-     * Pass [withCoverage] = true to instrument the binary for coverage collection.
-     */
     private fun buildWithProgress(withCoverage: Boolean = false): GoBuildResult {
-        val resultRef = Ref<GoBuildResult>()
-        val errorRef = Ref<Exception>()
+        val project = environment.project
+        val message = if (withCoverage) "Compiling Go program with coverage..." else "Compiling Go program..."
 
-        ProgressManager.getInstance().runProcessWithProgressSynchronously(
-            {
-                try {
-                    resultRef.set(buildGoApplication(config, withCoverage = withCoverage))
-                } catch (e: Exception) {
-                    errorRef.set(e)
-                }
-            },
-            if (withCoverage) "Compiling Go program with coverage..." else "Compiling Go program...",
-            true,
-            environment.project
-        )
+        // On EDT (e.g. coverage runs) use runProcessWithProgressSynchronously which pumps the event
+        // loop safely. Status bar widget is also installed so cancel works from there too.
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            val cancelled = AtomicBoolean(false)
+            val destroyBuild = AtomicReference<(() -> Unit)?>(null)
+            val resultRef = Ref<GoBuildResult>()
+            val errorRef = Ref<Exception>()
 
-        errorRef.get()?.let { throw ExecutionException(it.message, it) }
-        return resultRef.get() ?: throw ExecutionException("Build was cancelled.")
+            GoCompilationStatusWidget.install(project, message) {
+                cancelled.set(true)
+                destroyBuild.get()?.invoke()
+            }
+
+            ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                {
+                    try {
+                        resultRef.set(buildGoApplication(config, withCoverage = withCoverage) { handler ->
+                            destroyBuild.set { handler.destroyProcess() }
+                            if (cancelled.get()) handler.destroyProcess()
+                        })
+                    } catch (e: Exception) {
+                        errorRef.set(e)
+                    }
+                },
+                message, true, project
+            )
+
+            GoCompilationStatusWidget.remove(project)
+            errorRef.get()?.let { throw ExecutionException(it.message, it) }
+            return resultRef.get() ?: throw ExecutionException("Build was cancelled.")
+        }
+
+        // Already on a background thread — show status bar widget only, no dialog.
+        val cancelled = AtomicBoolean(false)
+        val destroyBuild = AtomicReference<(() -> Unit)?>(null)
+
+        GoCompilationStatusWidget.install(project, message) {
+            cancelled.set(true)
+            destroyBuild.get()?.invoke()
+        }
+
+        try {
+            val result = buildGoApplication(config, withCoverage = withCoverage) { handler ->
+                destroyBuild.set { handler.destroyProcess() }
+                if (cancelled.get()) handler.destroyProcess()
+            }
+            if (cancelled.get()) throw ExecutionException("Build was cancelled.")
+            return result
+        } catch (e: ExecutionException) {
+            throw e
+        } catch (e: Exception) {
+            if (cancelled.get()) throw ExecutionException("Build was cancelled.")
+            throw ExecutionException(e.message, e)
+        } finally {
+            GoCompilationStatusWidget.remove(project)
+        }
     }
 
     private fun createExternalTerminalCommandLine(exePath: String, config: GoRunConfiguration): GeneralCommandLine {

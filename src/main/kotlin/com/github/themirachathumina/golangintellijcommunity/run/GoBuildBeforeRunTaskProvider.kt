@@ -51,7 +51,11 @@ private fun deriveBinaryName(config: GoRunConfiguration): String {
     return if (SystemInfo.isWindows) "$base.exe" else base
 }
 
-fun buildGoApplication(config: GoRunConfiguration, withCoverage: Boolean = false): GoBuildResult {
+fun buildGoApplication(
+    config: GoRunConfiguration,
+    withCoverage: Boolean = false,
+    handlerCallback: ((CapturingProcessHandler) -> Unit)? = null
+): GoBuildResult {
     val sdkPath = GoProjectSettings.getInstance(config.project).state.goSdkPath
     val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
         ?: throw ExecutionException("Go SDK is not configured for this project.")
@@ -126,6 +130,7 @@ fun buildGoApplication(config: GoRunConfiguration, withCoverage: Boolean = false
     val goPath = envVars["GOPATH"] ?: System.getenv("GOPATH") ?: ""
 
     val handler = CapturingProcessHandler(buildCmd)
+    handlerCallback?.invoke(handler)
     val result = handler.runProcess()
 
     return GoBuildResult(
