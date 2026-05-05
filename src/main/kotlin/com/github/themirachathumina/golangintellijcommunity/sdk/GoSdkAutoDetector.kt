@@ -1,8 +1,10 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
 import com.github.themirachathumina.golangintellijcommunity.GoConstants
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
+import com.github.themirachathumina.golangintellijcommunity.util.FileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.ProcessRunner
+import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.RealProcessRunner
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -13,10 +15,12 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
-import com.intellij.openapi.util.io.FileUtil
 import java.io.File
 
-class GoSdkAutoDetector : ProjectActivity {
+class GoSdkAutoDetector(
+    private val fs: FileSystemAccess = RealFileSystemAccess(),
+    private val runner: ProcessRunner = RealProcessRunner()
+) : ProjectActivity {
     private val LOG = Logger.getInstance(GoSdkAutoDetector::class.java)
 
     companion object {
@@ -25,9 +29,9 @@ class GoSdkAutoDetector : ProjectActivity {
 
     override suspend fun execute(project: Project) {
         val basePath = project.basePath ?: return
-        val rootDir = File(basePath)
-        val isGoProject = rootDir.walkTopDown().maxDepth(2).any {
-            it.name == GoConstants.FileExtensions.WORK || it.name == GoConstants.FileExtensions.MOD || it.name.endsWith(GoConstants.FileExtensions.GO)
+        val isGoProject = fs.walk(basePath, maxDepth = 2).any {
+            val name = fs.getName(it)
+            name == GoConstants.FileExtensions.WORK || name == GoConstants.FileExtensions.MOD || name.endsWith(GoConstants.FileExtensions.GO)
         }
         if (!isGoProject) return
 
@@ -39,34 +43,35 @@ class GoSdkAutoDetector : ProjectActivity {
         }
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            resolveSdkForProject(project, rootDir)
+            resolveSdkForProject(project, basePath)
         }
     }
 
-    private fun resolveSdkForProject(project: Project, rootDir: File) {
-        val goVersionFile = File(rootDir, GoConstants.FileExtensions.GO_VERSION)
-        val requiredVersion: String? = if (goVersionFile.exists()) {
-            LOG.info("${GoConstants.Log.PREFIX} Found .go-version at ${goVersionFile.absolutePath}, using its version")
-            GoModDirectiveReader.readGoVersionFile(goVersionFile)
+    private fun resolveSdkForProject(project: Project, rootDir: String) {
+        val goVersionFile = fs.combine(rootDir, GoConstants.FileExtensions.GO_VERSION)
+        val requiredVersion: String? = if (fs.exists(goVersionFile)) {
+            LOG.info("${GoConstants.Log.PREFIX} Found .go-version at $goVersionFile, using its version")
+            GoModDirectiveReader(fs).readGoVersionFile(goVersionFile)
         } else {
-            val goWorkFile = File(rootDir, GoConstants.FileExtensions.WORK)
-            if (goWorkFile.exists()) {
-                LOG.info("${GoConstants.Log.PREFIX} Found go.work at ${goWorkFile.absolutePath}, using its go directive")
-                GoModDirectiveReader.readGoDirective(goWorkFile)
+            val goWorkFile = fs.combine(rootDir, GoConstants.FileExtensions.WORK)
+            if (fs.exists(goWorkFile)) {
+                LOG.info("${GoConstants.Log.PREFIX} Found go.work at $goWorkFile, using its go directive")
+                GoModDirectiveReader(fs).readGoDirective(goWorkFile)
             } else {
-                val allGoMods = rootDir.walkTopDown()
-                    .maxDepth(6)
-                    .onEnter { it.name != "vendor" && it.name != ".git" }
-                    .filter { it.name == GoConstants.FileExtensions.MOD }
+                val allGoMods = fs.walk(rootDir, maxDepth = 6)
+                    .filter {
+                        val name = fs.getName(it)
+                        name == GoConstants.FileExtensions.MOD && !it.contains("/vendor/") && !it.contains("/.git/")
+                    }
                     .toList()
                 allGoMods
-                    .mapNotNull { GoModDirectiveReader.readGoDirective(it) }
+                    .mapNotNull { GoModDirectiveReader(fs).readGoDirective(it) }
                     .maxWithOrNull(Comparator { a, b -> GoSdkVersion.compareVersions(a, b) })
             }
         }
 
-        val gotoolchain = GoEnvironmentReader.readGoEnvFile()[GoConstants.Env.GOTOOLCHAIN]
-            ?: System.getenv(GoConstants.Env.GOTOOLCHAIN)
+        val gotoolchain = GoEnvironmentReader(fs, runner).readGoEnvFile()[GoConstants.Env.GOTOOLCHAIN]
+            ?: fs.getEnv(GoConstants.Env.GOTOOLCHAIN)
         val toolchainVersion = gotoolchain
             ?.let { GOTOOLCHAIN_VERSION_REGEX.find(it)?.groupValues?.get(1) }
 
@@ -96,11 +101,11 @@ class GoSdkAutoDetector : ProjectActivity {
             return
         }
 
-        val systemPaths = GoSdkLocator.suggestSdkHomePaths()
+        val systemPaths = GoSdkLocator(fs, runner).suggestSdkHomePaths()
         val systemGo = systemPaths.firstOrNull()
 
         if (systemGo != null) {
-            val sysVersion = GoSdkVersion.retrieveGoVersion(systemGo)
+            val sysVersion = GoSdkVersion(fs, runner).retrieveGoVersion(systemGo)
             if (sysVersion != null && requiredVersion != null) {
                 if (GoSdkVersion.compareVersions(sysVersion, requiredVersion) >= 0) {
                     registry.addSdkPath(systemGo)
@@ -108,7 +113,7 @@ class GoSdkAutoDetector : ProjectActivity {
                     return
                 } else if (GoSdkVersion.compareVersions(sysVersion, GoConstants.Sdk.MIN_VERSION) >= 0) {
                     val downloadedRoot = runGoEnvGoroot(systemGo, rootDir)
-                    if (downloadedRoot != null && GoSdkLocator.isValidSdkHome(downloadedRoot)) {
+                    if (downloadedRoot != null && GoSdkLocator(fs, runner).isValidSdkHome(downloadedRoot)) {
                         registry.addSdkPath(downloadedRoot)
                         assignAndStart(project, downloadedRoot)
                         return
@@ -124,13 +129,11 @@ class GoSdkAutoDetector : ProjectActivity {
         promptMissingSdk(project, requiredVersion)
     }
 
-    private fun runGoEnvGoroot(systemGoPath: String, workDir: File): String? {
-        val goExe = GoSdkLocator.getGoExecutablePath(systemGoPath) ?: return null
+    private fun runGoEnvGoroot(systemGoPath: String, workDir: String): String? {
+        val goExe = GoSdkLocator(fs, runner).getGoExecutablePath(systemGoPath) ?: return null
         return try {
-            val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "env", GoConstants.Env.GOROOT).withWorkDirectory(workDir)
-            val handler = CapturingProcessHandler(cmd)
-            val output = handler.runProcess(30000)
-            if (output.exitCode == 0) FileUtil.toSystemIndependentName(output.stdout.trim()) else null
+            val output = runner.run(listOf(goExe, "env", GoConstants.Env.GOROOT), workDir = workDir, timeoutMs = 30000)
+            if (output.exitCode == 0) output.stdout.trim() else null
         } catch (e: Exception) {
             null
         }

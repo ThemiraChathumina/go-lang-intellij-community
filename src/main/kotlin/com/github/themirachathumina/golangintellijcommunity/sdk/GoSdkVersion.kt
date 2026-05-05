@@ -1,31 +1,42 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
 import com.github.themirachathumina.golangintellijcommunity.GoConstants
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
+import com.github.themirachathumina.golangintellijcommunity.util.FileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.ProcessRunner
+import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.RealProcessRunner
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.util.io.FileUtil
-import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
-object GoSdkVersion {
-    private val LOG = Logger.getInstance(GoSdkVersion::class.java)
+class GoSdkVersion(
+    private val fs: FileSystemAccess = RealFileSystemAccess(),
+    private val runner: ProcessRunner = RealProcessRunner()
+) {
+    companion object {
+        private val LOG = Logger.getInstance(GoSdkVersion::class.java)
 
-    private val VERSION_FILE_REGEX = """^go(\d+\.\d+(\.\d+)?)""".toRegex()
-    private val VERSION_OUTPUT_REGEX = """go version go(\d+\.\d+(\.\d+)?)""".toRegex()
+        private val VERSION_FILE_REGEX = """^go(\d+\.\d+(\.\d+)?)""".toRegex()
+        private val VERSION_OUTPUT_REGEX = """go version go(\d+\.\d+(\.\d+)?)""".toRegex()
 
-    private val versionCache = mutableMapOf<String, String>()
-    private val pendingVersions = mutableSetOf<String>()
+        private val versionCache = ConcurrentHashMap<String, String>()
+        private val pendingVersions = ConcurrentHashMap.newKeySet<String>()
+
+        private val DEFAULT = GoSdkVersion()
+
+        fun retrieveGoVersion(sdkHomePath: String): String? = DEFAULT.retrieveGoVersion(sdkHomePath)
+        fun compareVersions(v1: String, v2: String): Int = DEFAULT.compareVersions(v1, v2)
+        fun isSupportedVersion(version: String): Boolean = DEFAULT.isSupportedVersion(version)
+    }
 
     fun retrieveGoVersion(sdkHomePath: String): String? {
-        val normalizedPath = FileUtil.toSystemIndependentName(sdkHomePath)
-        versionCache[normalizedPath]?.let { return it }
+        versionCache[sdkHomePath]?.let { return it }
 
         val versionFromFile = readVersionFile(sdkHomePath)
         if (versionFromFile != null) {
-            LOG.debug("Read Go version $versionFromFile from VERSION file for $normalizedPath")
-            versionCache[normalizedPath] = versionFromFile
+            LOG.debug("Read Go version $versionFromFile from VERSION file for $sdkHomePath")
+            versionCache[sdkHomePath] = versionFromFile
             return versionFromFile
         }
 
@@ -33,14 +44,14 @@ object GoSdkVersion {
         if (exePath == null) return null
 
         if (ApplicationManager.getApplication().isDispatchThread) {
-            if (!pendingVersions.contains(normalizedPath)) {
-                pendingVersions.add(normalizedPath)
-                LOG.info("${GoConstants.Log.PREFIX} Scheduling background version retrieval for: $normalizedPath")
+            if (!pendingVersions.contains(sdkHomePath)) {
+                pendingVersions.add(sdkHomePath)
+                LOG.info("${GoConstants.Log.PREFIX} Scheduling background version retrieval for: $sdkHomePath")
                 ApplicationManager.getApplication().executeOnPooledThread {
                     try {
-                        doRetrieveGoVersion(normalizedPath, exePath)
+                        doRetrieveGoVersion(sdkHomePath, exePath)
                     } finally {
-                        pendingVersions.remove(normalizedPath)
+                        pendingVersions.remove(sdkHomePath)
                         ApplicationManager.getApplication().invokeLater({
                             ApplicationManager.getApplication().messageBus.syncPublisher(GoGlobalSdkRegistry.TOPIC).sdkRegistryChanged()
                         }, ModalityState.any())
@@ -50,14 +61,14 @@ object GoSdkVersion {
             return null
         }
 
-        return doRetrieveGoVersion(normalizedPath, exePath)
+        return doRetrieveGoVersion(sdkHomePath, exePath)
     }
 
     private fun readVersionFile(sdkHomePath: String): String? {
-        val versionFile = File(FileUtil.toSystemDependentName(sdkHomePath), GoConstants.Sdk.VERSION_FILE)
-        if (!versionFile.exists()) return null
+        val versionFile = fs.combine(sdkHomePath, GoConstants.Sdk.VERSION_FILE)
+        if (!fs.exists(versionFile)) return null
         return try {
-            val content = versionFile.readText().trim()
+            val content = fs.readText(versionFile)?.trim() ?: return null
             VERSION_FILE_REGEX.find(content)?.groupValues?.get(1)
         } catch (e: Exception) {
             LOG.debug("Failed to read VERSION file at $sdkHomePath: ${e.message}")
@@ -65,26 +76,23 @@ object GoSdkVersion {
         }
     }
 
-    private fun doRetrieveGoVersion(normalizedPath: String, exePath: String): String? {
+    private fun doRetrieveGoVersion(sdkHomePath: String, exePath: String): String? {
         try {
-            val sysDepExe = FileUtil.toSystemDependentName(exePath)
-            LOG.debug("Running '$sysDepExe version' to retrieve Go version...")
-            val commandLine = GeneralCommandLine(sysDepExe, "version")
-            val handler = CapturingProcessHandler(commandLine)
-            val output = handler.runProcess(5000)
+            LOG.debug("Running '$exePath version' to retrieve Go version...")
+            val output = runner.run(listOf(exePath, "version"))
 
             if (output.exitCode == 0) {
                 val stdout = output.stdout
                 val match = VERSION_OUTPUT_REGEX.find(stdout)
                 val version = match?.groupValues?.get(1)
                 if (version != null) {
-                    LOG.info("Detected Go version $version for $normalizedPath")
-                    versionCache[normalizedPath] = version
+                    LOG.info("Detected Go version $version for $sdkHomePath")
+                    versionCache[sdkHomePath] = version
                     return version
                 }
             }
         } catch (e: Exception) {
-            LOG.error("Error retrieving Go version for $normalizedPath", e)
+            LOG.error("Error retrieving Go version for $sdkHomePath", e)
         }
         return null
     }

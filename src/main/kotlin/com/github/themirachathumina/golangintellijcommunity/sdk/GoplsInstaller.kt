@@ -1,8 +1,10 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
 import com.github.themirachathumina.golangintellijcommunity.GoConstants
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
+import com.github.themirachathumina.golangintellijcommunity.util.FileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.ProcessRunner
+import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.RealProcessRunner
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -12,14 +14,21 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.io.FileUtil
 import com.redhat.devtools.lsp4ij.LanguageServerManager
 
-object GoplsInstaller {
-    private val LOG = Logger.getInstance(GoplsInstaller::class.java)
+class GoplsInstaller(
+    private val fs: FileSystemAccess = RealFileSystemAccess(),
+    private val runner: ProcessRunner = RealProcessRunner()
+) {
+    companion object {
+        private val LOG = Logger.getInstance(GoplsInstaller::class.java)
+        private val DEFAULT = GoplsInstaller()
+
+        fun checkAndStart(project: Project, sdkHome: String) = DEFAULT.checkAndStart(project, sdkHome)
+    }
 
     fun checkAndStart(project: Project, sdkHome: String) {
-        if (GoSdkLocator.isGoplsInstalled(sdkHome)) {
+        if (GoSdkLocator(fs, runner).isGoplsInstalled(sdkHome)) {
             ApplicationManager.getApplication().invokeLater {
                 LOG.info("GoplsInstaller: Starting gopls for ${project.name}")
                 LanguageServerManager.getInstance(project).start(GoConstants.Lsp.SERVER_ID)
@@ -52,17 +61,18 @@ object GoplsInstaller {
                 indicator.isIndeterminate = true
                 indicator.text = "Downloading and compiling golang.org/x/tools/gopls@latest..."
 
-                val goExe = GoSdkLocator.getGoExecutablePath(sdkHome)
+                val goExe = GoSdkLocator(fs, runner).getGoExecutablePath(sdkHome)
                 if (goExe == null) {
                     LOG.error("Cannot install gopls: Go executable not found.")
                     return
                 }
 
                 try {
-                    val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "install", "golang.org/x/tools/gopls@latest")
-                        .withEnvironment(GoConstants.Env.GOROOT, FileUtil.toSystemDependentName(sdkHome))
-                    val handler = CapturingProcessHandler(cmd)
-                    val output = handler.runProcess(120 * 1000)
+                    val output = runner.run(
+                        listOf(goExe, "install", "golang.org/x/tools/gopls@latest"),
+                        env = mapOf(GoConstants.Env.GOROOT to sdkHome),
+                        timeoutMs = 120 * 1000
+                    )
 
                     if (output.exitCode == 0) {
                         LOG.info("Successfully installed gopls.")

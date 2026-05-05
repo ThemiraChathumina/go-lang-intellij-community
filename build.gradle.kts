@@ -129,11 +129,16 @@ kover {
 }
 
 tasks {
+    build {
+        dependsOn(test)
+    }
+
     wrapper {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
     }
 
     runIde {
+        dependsOn(test)
         jvmArgumentProviders += CommandLineArgumentProvider {
             listOf(
                 "-Didea.log.debug.categories=#com.github.themirachathumina.golangintellijcommunity",

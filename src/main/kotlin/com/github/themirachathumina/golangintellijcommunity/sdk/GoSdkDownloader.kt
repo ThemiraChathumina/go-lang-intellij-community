@@ -1,5 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.util.FileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemAccess
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.diagnostic.Logger
@@ -11,10 +13,19 @@ import com.intellij.util.io.HttpRequests
 import java.io.File
 import java.net.URI
 
-object GoSdkDownloader {
-    private val LOG = Logger.getInstance(GoSdkDownloader::class.java)
-    private val proxyLock = Any()
-    private val VERSION_TAG_REGEX = Regex("""^go(\d+\.\d+(\.\d+)?)""")
+class GoSdkDownloader(
+    private val fs: FileSystemAccess = RealFileSystemAccess()
+) {
+    companion object {
+        private val LOG = Logger.getInstance(GoSdkDownloader::class.java)
+        private val proxyLock = Any()
+        private val VERSION_TAG_REGEX = Regex("""^go(\d+\.\d+(\.\d+)?)""")
+
+        private val DEFAULT = GoSdkDownloader()
+
+        fun fetchVersions(): List<String> = DEFAULT.fetchVersions()
+        fun downloadSdk(version: String, indicator: ProgressIndicator): String? = DEFAULT.downloadSdk(version, indicator)
+    }
 
     data class GoRelease(val version: String, val stable: Boolean, val files: List<GoFile>)
     data class GoFile(val filename: String, val os: String, val arch: String, val kind: String)
@@ -54,42 +65,42 @@ object GoSdkDownloader {
             val fileInfo = release.files.find { it.os == targetOs && it.arch == targetArch && it.kind == "archive" } ?: return null
 
             val downloadUrl = "$baseUrl/${fileInfo.filename}"
-            val sdkBaseDir = File(System.getProperty("user.home"), "sdk")
-            if (!sdkBaseDir.exists()) sdkBaseDir.mkdirs()
+            val sdkBaseDir = fs.combine(fs.getUserHome(), "sdk")
+            if (!fs.exists(sdkBaseDir)) fs.mkdirs(sdkBaseDir)
 
-            val archiveFile = File(sdkBaseDir, fileInfo.filename)
-            val extractDir = File(sdkBaseDir, "tmp_$version")
-            val destDir = File(sdkBaseDir, version)
+            val archivePath = fs.combine(sdkBaseDir, fileInfo.filename)
+            val archiveFile = File(FileUtil.toSystemDependentName(archivePath))
+            val extractPath = fs.combine(sdkBaseDir, "tmp_$version")
+            val destPath = fs.combine(sdkBaseDir, version)
 
-            if (destDir.exists()) {
-                val innerGo = File(destDir, "go")
-                val existing = if (innerGo.exists()) innerGo.absolutePath else destDir.absolutePath
-                return FileUtil.toSystemIndependentName(existing)
+            if (fs.exists(destPath)) {
+                val innerGo = fs.combine(destPath, "go")
+                val existing = if (fs.exists(innerGo)) innerGo else destPath
+                return existing
             }
 
             indicator.text = "Downloading $version..."
             withProxyConfigured { HttpRequests.request(downloadUrl).saveToFile(archiveFile, indicator) }
 
             indicator.text = "Extracting $version..."
-            if (archiveFile.name.endsWith(".zip")) {
-                Decompressor.Zip(archiveFile.toPath()).extract(extractDir.toPath())
-            } else if (archiveFile.name.endsWith(".tar.gz")) {
-                Decompressor.Tar(archiveFile.toPath()).extract(extractDir.toPath())
+            if (archivePath.endsWith(".zip")) {
+                Decompressor.Zip(archiveFile.toPath()).extract(File(FileUtil.toSystemDependentName(extractPath)).toPath())
+            } else if (archivePath.endsWith(".tar.gz")) {
+                Decompressor.Tar(archiveFile.toPath()).extract(File(FileUtil.toSystemDependentName(extractPath)).toPath())
             }
 
-            archiveFile.delete()
+            fs.delete(archivePath)
 
-            val extractedGoDir = File(extractDir, "go")
-            if (extractedGoDir.exists()) {
-                extractedGoDir.renameTo(destDir)
-                extractDir.deleteRecursively()
+            val extractedGoDir = fs.combine(extractPath, "go")
+            if (fs.exists(extractedGoDir)) {
+                fs.renameTo(extractedGoDir, destPath)
+                fs.deleteRecursively(extractPath)
             } else {
-                extractDir.renameTo(destDir)
+                fs.renameTo(extractPath, destPath)
             }
 
-            val finalPath = FileUtil.toSystemIndependentName(destDir.absolutePath)
-            GoGlobalSdkRegistry.getInstance().addSdkPath(finalPath)
-            return finalPath
+            GoGlobalSdkRegistry.getInstance().addSdkPath(destPath)
+            return destPath
         } catch (e: Exception) {
             LOG.error("Failed to download Go SDK", e)
             return null
@@ -129,10 +140,10 @@ object GoSdkDownloader {
             ?: goEnv["https_proxy"]
             ?: goEnv["HTTP_PROXY"]
             ?: goEnv["http_proxy"]
-            ?: System.getenv("HTTPS_PROXY")
-            ?: System.getenv("https_proxy")
-            ?: System.getenv("HTTP_PROXY")
-            ?: System.getenv("http_proxy")
+            ?: fs.getEnv("HTTPS_PROXY")
+            ?: fs.getEnv("https_proxy")
+            ?: fs.getEnv("HTTP_PROXY")
+            ?: fs.getEnv("http_proxy")
     }
 
     private fun parseProxyUrl(proxyUrl: String): Triple<String, Int, String>? {

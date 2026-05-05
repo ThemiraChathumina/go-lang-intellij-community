@@ -12,7 +12,7 @@ class GoLanguageClient(project: Project) : LanguageClientImpl(project) {
      * Called by lsp4ij when gopls sends workspace/configuration { section: "gopls" }.
      * Returns a root JsonObject keyed by section so findSettings("gopls", ...) resolves correctly.
      */
-    override fun createSettings(): Any {
+    public override fun createSettings(): Any {
         val goplsSettings = JsonObject().apply {
             addProperty("semanticTokens", GoAppSettings.getInstance().state.semanticTokensEnabled)
         }

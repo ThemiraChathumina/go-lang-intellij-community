@@ -5,6 +5,8 @@ import com.github.themirachathumina.golangintellijcommunity.sdk.GoEnvironmentRea
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings
+import com.github.themirachathumina.golangintellijcommunity.util.FileSystemAccess
+import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemAccess
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -16,7 +18,7 @@ import org.eclipse.lsp4j.services.LanguageServer
 import org.jetbrains.annotations.NotNull
 import java.io.File
 
-class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionProvider() {
+class GoLanguageServer(@NotNull project: Project, private val fs: FileSystemAccess = RealFileSystemAccess()) : OSProcessStreamConnectionProvider() {
     private val LOG = Logger.getInstance(GoLanguageServer::class.java)
     private val semanticLogger = GoLspSemanticLogger()
 
@@ -24,28 +26,27 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
         LOG.info("${GoConstants.Log.PREFIX} Initializing GoLanguageServer for project: ${project.name}")
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
 
-        val goplsExe = GoSdkLocator.getGoplsExecutablePath(if (sdkPath.isNotEmpty()) sdkPath else null) ?: GoSdkLocator.GOPLS_EXECUTABLE_NAME
+        val goplsExe = GoSdkLocator(fs).getGoplsExecutablePath(if (sdkPath.isNotEmpty()) sdkPath else null) ?: GoSdkLocator.GOPLS_EXECUTABLE_NAME
         LOG.info("${GoConstants.Log.PREFIX} Using gopls executable: $goplsExe")
 
-        val commandLine = GeneralCommandLine(FileUtil.toSystemDependentName(goplsExe), "serve")
+        val commandLine = GeneralCommandLine(goplsExe, "serve")
 
-        if (sdkPath.isNotEmpty() && GoSdkLocator.isValidSdkHome(sdkPath)) {
-            val sysDepSdkPath = FileUtil.toSystemDependentName(sdkPath)
-            commandLine.withEnvironment(GoConstants.Env.GOROOT, sysDepSdkPath)
-            val oldPath = System.getenv("PATH") ?: ""
-            val binPath = File(sysDepSdkPath, "bin").absolutePath
+        if (sdkPath.isNotEmpty() && GoSdkLocator(fs).isValidSdkHome(sdkPath)) {
+            commandLine.withEnvironment(GoConstants.Env.GOROOT, sdkPath)
+            val oldPath = fs.getEnv("PATH") ?: ""
+            val binPath = fs.combine(sdkPath, "bin")
             commandLine.withEnvironment("PATH", "$binPath${File.pathSeparator}$oldPath")
         }
 
-        val effectiveGoPath = GoEnvironmentReader.resolveGoPath().map { FileUtil.toSystemDependentName(it) }.joinToString(File.pathSeparator)
-        val systemGoPath = System.getenv(GoConstants.Env.GOPATH) ?: ""
+        val effectiveGoPath = GoEnvironmentReader(fs).resolveGoPath().joinToString(File.pathSeparator)
+        val systemGoPath = fs.getEnv(GoConstants.Env.GOPATH) ?: ""
         if (effectiveGoPath != systemGoPath) {
             commandLine.withEnvironment(GoConstants.Env.GOPATH, effectiveGoPath)
             LOG.info("${GoConstants.Log.PREFIX} Setting GOPATH for gopls: $effectiveGoPath")
         }
 
-        val effectiveGoModCache = FileUtil.toSystemDependentName(GoEnvironmentReader.resolveGoModCache())
-        val systemGoModCache = System.getenv(GoConstants.Env.GOMODCACHE) ?: ""
+        val effectiveGoModCache = GoEnvironmentReader(fs).resolveGoModCache()
+        val systemGoModCache = fs.getEnv(GoConstants.Env.GOMODCACHE) ?: ""
         if (effectiveGoModCache != systemGoModCache) {
             commandLine.withEnvironment(GoConstants.Env.GOMODCACHE, effectiveGoModCache)
             LOG.info("${GoConstants.Log.PREFIX} Setting GOMODCACHE for gopls: $effectiveGoModCache")
