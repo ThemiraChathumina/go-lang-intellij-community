@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import java.io.File
@@ -40,19 +41,19 @@ object GoModUtils {
 
     private fun findGoMod(project: Project): File? {
         val base = project.basePath ?: return null
-        val candidate = File(base, "go.mod")
+        val candidate = File(base, GoConstants.FileExtensions.MOD)
         if (candidate.exists()) return candidate
-        
+
         // Fallback: search one level deep if not in root (common in monorepos)
         return File(base).listFiles()?.filter { it.isDirectory }
-            ?.map { File(it, "go.mod") }
+            ?.map { File(it, GoConstants.FileExtensions.MOD) }
             ?.firstOrNull { it.exists() }
     }
 
     private fun findGoModForFile(file: VirtualFile): File? {
         var current = File(file.path).parentFile
         while (current != null) {
-            val candidate = File(current, "go.mod")
+            val candidate = File(current, GoConstants.FileExtensions.MOD)
             if (candidate.exists()) return candidate
             current = current.parentFile
         }

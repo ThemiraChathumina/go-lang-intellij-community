@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.openapi.application.ApplicationManager
@@ -10,9 +11,8 @@ import java.io.File
 
 object GoSdkUtils {
     private val LOG = Logger.getInstance(GoSdkUtils::class.java)
-    val GO_EXECUTABLE_NAME = if (SystemInfo.isWindows) "go.exe" else "go"
-    val GOPLS_EXECUTABLE_NAME = if (SystemInfo.isWindows) "gopls.exe" else "gopls"
-    const val MIN_SUPPORTED_VERSION = "1.21"
+    val GO_EXECUTABLE_NAME = if (SystemInfo.isWindows) "go.exe" else GoConstants.Executables.GO
+    val GOPLS_EXECUTABLE_NAME = if (SystemInfo.isWindows) "gopls.exe" else GoConstants.Executables.GOPLS
 
     private val versionCache = mutableMapOf<String, String>()
     private val pendingVersions = mutableSetOf<String>()
@@ -23,7 +23,7 @@ object GoSdkUtils {
         val goExe = File(binDir, GO_EXECUTABLE_NAME)
         val exists = goExe.exists() && goExe.canExecute()
         if (!exists) {
-            LOG.debug("[Go-Lang-Community] Go executable not found or not executable at: ${goExe.absolutePath}")
+            LOG.debug("${GoConstants.Log.PREFIX} Go executable not found or not executable at: ${goExe.absolutePath}")
         }
         return if (exists) FileUtil.toSystemIndependentName(goExe.absolutePath) else null
     }
@@ -42,8 +42,8 @@ object GoSdkUtils {
         // Collect all GOPATH entries: system env, Go env file, and default ~/go — split on path separator
         val gopathEntries = buildList {
             val goEnv = readGoEnvFile()
-            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(it) }
-            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(it) }
+            goEnv[GoConstants.Env.GOPATH]?.split(File.pathSeparator)?.forEach { add(it) }
+            System.getenv(GoConstants.Env.GOPATH)?.split(File.pathSeparator)?.forEach { add(it) }
             add(File(System.getProperty("user.home"), "go").absolutePath)
         }.distinct()
 
@@ -82,7 +82,7 @@ object GoSdkUtils {
     }
 
     private fun readVersionFile(sdkHomePath: String): String? {
-        val versionFile = File(FileUtil.toSystemDependentName(sdkHomePath), "VERSION")
+        val versionFile = File(FileUtil.toSystemDependentName(sdkHomePath), GoConstants.Sdk.VERSION_FILE)
         if (!versionFile.exists()) return null
         return try {
             // Format: "go1.22.3" or "go1.22.3 cl/123456" or "devel ..." for tip builds
@@ -114,7 +114,7 @@ object GoSdkUtils {
         if (ApplicationManager.getApplication().isDispatchThread) {
             if (!pendingVersions.contains(normalizedPath)) {
                 pendingVersions.add(normalizedPath)
-                LOG.info("[Go-Lang-Community] Scheduling background version retrieval for: $normalizedPath")
+                LOG.info("${GoConstants.Log.PREFIX} Scheduling background version retrieval for: $normalizedPath")
                 ApplicationManager.getApplication().executeOnPooledThread {
                     try {
                         doRetrieveGoVersion(normalizedPath, exePath)
@@ -199,19 +199,19 @@ object GoSdkUtils {
 
         // --- Go env file overrides (highest priority — mirrors how Go tools resolve env) ---
 
-        goEnv["GOROOT"]?.let {
+        goEnv[GoConstants.Env.GOROOT]?.let {
             LOG.debug("Checking GOROOT from Go env file: $it")
             if (isValidSdkHome(it)) suggestions.add(it)
         }
 
         // All GOPATH entries (env file + system) may contain sdk/ subdirs with downloaded toolchains
         resolveGoPath().forEach { gopathEntry ->
-            scanVersionedDir(File(gopathEntry, "sdk"), prefix = "go", suggestions)
+            scanVersionedDir(File(gopathEntry, "sdk"), prefix = GoConstants.Sdk.VERSION_PREFIX, suggestions)
         }
 
         // --- System environment variables ---
 
-        System.getenv("GOROOT")?.let {
+        System.getenv(GoConstants.Env.GOROOT)?.let {
             LOG.debug("Checking GOROOT: $it")
             if (isValidSdkHome(it)) suggestions.add(it)
         }
@@ -231,12 +231,12 @@ object GoSdkUtils {
         }
 
         // --- Go toolchain management: ~/sdk/go* ---
-        scanVersionedDir(File(home, "sdk"), prefix = "go", suggestions)
+        scanVersionedDir(File(home, "sdk"), prefix = GoConstants.Sdk.VERSION_PREFIX, suggestions)
 
         // --- Version managers ---
 
         // gvm: ~/.gvm/gos/go*
-        scanVersionedDir(File(home, ".gvm/gos"), prefix = "go", suggestions)
+        scanVersionedDir(File(home, ".gvm/gos"), prefix = GoConstants.Sdk.VERSION_PREFIX, suggestions)
 
         // goenv: ~/.goenv/versions/*
         scanVersionedDir(File(home, ".goenv/versions"), prefix = "", suggestions)
@@ -349,7 +349,7 @@ object GoSdkUtils {
     }
 
     fun isSupportedVersion(version: String): Boolean {
-        return compareVersions(version, MIN_SUPPORTED_VERSION) >= 0
+        return compareVersions(version, GoConstants.Sdk.MIN_VERSION) >= 0
     }
 
     /**
@@ -380,8 +380,8 @@ object GoSdkUtils {
     fun resolveGoPath(): List<String> {
         val goEnv = readGoEnvFile()
         return buildList {
-            goEnv["GOPATH"]?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
-            System.getenv("GOPATH")?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
+            goEnv[GoConstants.Env.GOPATH]?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
+            System.getenv(GoConstants.Env.GOPATH)?.split(File.pathSeparator)?.forEach { add(FileUtil.toSystemIndependentName(it)) }
             add(FileUtil.toSystemIndependentName(File(System.getProperty("user.home"), "go").absolutePath))
         }.distinct()
     }
@@ -392,8 +392,8 @@ object GoSdkUtils {
      */
     fun resolveGoModCache(): String {
         val goEnv = readGoEnvFile()
-        goEnv["GOMODCACHE"]?.let { return FileUtil.toSystemIndependentName(it) }
-        System.getenv("GOMODCACHE")?.let { return FileUtil.toSystemIndependentName(it) }
+        goEnv[GoConstants.Env.GOMODCACHE]?.let { return FileUtil.toSystemIndependentName(it) }
+        System.getenv(GoConstants.Env.GOMODCACHE)?.let { return FileUtil.toSystemIndependentName(it) }
         return FileUtil.toSystemIndependentName(File(resolveGoPath().first(), "pkg/mod").absolutePath)
     }
 }

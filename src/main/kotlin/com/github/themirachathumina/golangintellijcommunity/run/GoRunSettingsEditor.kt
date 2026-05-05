@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.execution.configuration.EnvironmentVariablesComponent
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
@@ -54,7 +55,7 @@ class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunCo
         addBrowseFolderListener("Select Target", null, project, object : FileChooserDescriptor(true, true, false, false, false, false) {
             override fun isFileSelectable(file: VirtualFile?): Boolean {
                 return if (currentKind == GoRunKind.FILE) {
-                    file != null && !file.isDirectory && file.extension == "go"
+                    file != null && !file.isDirectory && file.extension == GoConstants.FileExtensions.GO_EXT
                 } else {
                     file != null && file.isDirectory
                 }

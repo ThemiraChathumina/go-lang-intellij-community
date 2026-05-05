@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.ide.actions
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.intellij.ide.actions.CreateFileFromTemplateAction
 import com.intellij.ide.actions.CreateFileFromTemplateDialog
@@ -27,11 +28,11 @@ class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new G
     override fun postProcess(createdFile: PsiFile, templateName: String?, customProperties: Map<String, String>?) {
         super.postProcess(createdFile, templateName, customProperties)
         
-        LOG.info("[Go-Lang-Community] Post-processing created file: ${createdFile.name} (template: $templateName)")
+        LOG.info("${GoConstants.Log.PREFIX} Post-processing created file: ${createdFile.name} (template: $templateName)")
 
         // Don't sanitize if it's explicitly a Main file template which uses 'package main'
         if (templateName == "Go Main File") {
-            LOG.info("[Go-Lang-Community] Skipping sanitization for Main file")
+            LOG.info("${GoConstants.Log.PREFIX} Skipping sanitization for Main file")
             return
         }
 
@@ -51,7 +52,7 @@ class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new G
                 val newFirstLine = "package $sanitizedPackage"
                 
                 if (firstLine != newFirstLine) {
-                    LOG.info("[Go-Lang-Community] Updating package declaration from '$firstLine' to '$newFirstLine'")
+                    LOG.info("${GoConstants.Log.PREFIX} Updating package declaration from '$firstLine' to '$newFirstLine'")
                     document.replaceString(0, firstLine.length, newFirstLine)
                     documentManager.commitDocument(document)
                 }
@@ -62,7 +63,7 @@ class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new G
     private fun sanitizePackageName(name: String): String {
         val sanitized = name.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
         val result = if (sanitized.isEmpty() || sanitized[0].isDigit()) "main" else sanitized
-        LOG.debug("[Go-Lang-Community] Sanitized package name for directory '$name': $result")
+        LOG.debug("${GoConstants.Log.PREFIX} Sanitized package name for directory '$name': $result")
         return result
     }
 }

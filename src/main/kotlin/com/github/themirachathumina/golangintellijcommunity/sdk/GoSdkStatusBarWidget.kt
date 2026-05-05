@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistryListener
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -113,7 +114,7 @@ class GoSdkStatusBarWidget(private val project: Project) : CustomStatusBarWidget
                     }
                     val version = GoSdkUtils.retrieveGoVersion(path)
                     if (version != null && !GoSdkUtils.isSupportedVersion(version)) {
-                        Messages.showErrorDialog(project, "Go $version is not supported. Minimum required version is Go ${GoSdkUtils.MIN_SUPPORTED_VERSION}.", "Unsupported SDK Version")
+                        Messages.showErrorDialog(project, "Go $version is not supported. Minimum required version is Go ${GoConstants.Sdk.MIN_VERSION}.", "Unsupported SDK Version")
                         return@chooseFile
                     }
                     registry.addSdkPath(path)
@@ -175,8 +176,8 @@ class GoSdkStatusBarWidget(private val project: Project) : CustomStatusBarWidget
         
         // Restart LSP
         ApplicationManager.getApplication().invokeLater {
-            LanguageServerManager.getInstance(project).stop("gopls")
-            LanguageServerManager.getInstance(project).start("gopls")
+            LanguageServerManager.getInstance(project).stop(GoConstants.Lsp.SERVER_ID)
+            LanguageServerManager.getInstance(project).start(GoConstants.Lsp.SERVER_ID)
         }
     }
 

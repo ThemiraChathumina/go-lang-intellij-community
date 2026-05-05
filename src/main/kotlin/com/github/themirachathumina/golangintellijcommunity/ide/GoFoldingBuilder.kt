@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.ide
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.psi.GoBlock
 import com.github.themirachathumina.golangintellijcommunity.psi.GoImportDecl
 import com.github.themirachathumina.golangintellijcommunity.psi.GoInterfaceType
@@ -18,7 +19,7 @@ class GoFoldingBuilder : FoldingBuilderEx(), DumbAware {
     private val LOG = Logger.getInstance(GoFoldingBuilder::class.java)
 
     override fun buildFoldRegions(root: PsiElement, document: Document, quick: Boolean): Array<FoldingDescriptor> {
-        LOG.debug("[Go-Lang-Community] Building fold regions for ${root.containingFile?.name}")
+        LOG.debug("${GoConstants.Log.PREFIX} Building fold regions for ${root.containingFile?.name}")
         val descriptors = mutableListOf<FoldingDescriptor>()
 
         // 1. Blocks { ... }

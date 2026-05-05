@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.ide
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.codeInsight.editorActions.QuoteHandler
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Editor
@@ -13,7 +14,7 @@ class GoQuoteHandler : QuoteHandler {
         val tokenType = iterator.tokenType
         val result = tokenType == GoTypes.STRING_LIT || tokenType == GoTypes.RUNE_LIT
         if (result) {
-            LOG.debug("[Go-Lang-Community] Detected opening quote for token type: $tokenType")
+            LOG.debug("${GoConstants.Log.PREFIX} Detected opening quote for token type: $tokenType")
         }
         return result
     }
@@ -22,7 +23,7 @@ class GoQuoteHandler : QuoteHandler {
         val tokenType = iterator.tokenType
         val result = tokenType == GoTypes.STRING_LIT || tokenType == GoTypes.RUNE_LIT
         if (result) {
-            LOG.debug("[Go-Lang-Community] Detected closing quote for token type: $tokenType")
+            LOG.debug("${GoConstants.Log.PREFIX} Detected closing quote for token type: $tokenType")
         }
         return result
     }

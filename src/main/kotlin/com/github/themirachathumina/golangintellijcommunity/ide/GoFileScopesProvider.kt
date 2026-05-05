@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.ide
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.openapi.project.Project
 import com.intellij.psi.search.scope.packageSet.CustomScopesProvider
 import com.intellij.psi.search.scope.packageSet.FilePatternPackageSet
@@ -15,12 +16,12 @@ class GoFileScopesProvider(private val project: Project) : CustomScopesProvider 
 
     override fun getCustomScopes(): List<NamedScope> = listOf(
         NamedScope(TEST_FILES_SCOPE, UnionPackageSet.create(
-            FilePatternPackageSet(null, "*_test.go"),
-            FilePatternPackageSet(null, "**/*_test.go")
+            FilePatternPackageSet(null, "*${GoConstants.FileExtensions.TEST_SUFFIX}"),
+            FilePatternPackageSet(null, "**/*${GoConstants.FileExtensions.TEST_SUFFIX}")
         )),
         NamedScope(SUM_FILE_SCOPE, UnionPackageSet.create(
-            FilePatternPackageSet(null, "go.sum"),
-            FilePatternPackageSet(null, "**/go.sum")
+            FilePatternPackageSet(null, GoConstants.FileExtensions.SUM),
+            FilePatternPackageSet(null, "**/${GoConstants.FileExtensions.SUM}")
         ))
     )
 }

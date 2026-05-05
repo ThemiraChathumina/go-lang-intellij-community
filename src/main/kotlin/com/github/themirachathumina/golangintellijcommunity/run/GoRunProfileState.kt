@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.coverage.CoverageExecutor
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.ExecutionResult
@@ -68,15 +69,15 @@ class GoRunProfileState(
         val envVars = runCmd.environment
         envVars.putAll(config.envVariables)
         // Coverage: tell the instrumented binary where to write coverage data
-        coverageDir?.let { envVars["GOCOVERDIR"] = FileUtil.toSystemDependentName(it) }
-        if (config.goOS.isNotEmpty()) envVars["GOOS"] = config.goOS
-        if (config.goArch.isNotEmpty()) envVars["GOARCH"] = config.goArch
-        envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
-        if (config.goProxy.isNotEmpty()) envVars["GOPROXY"] = config.goProxy
+        coverageDir?.let { envVars[GoConstants.Env.GOCOVERDIR] = FileUtil.toSystemDependentName(it) }
+        if (config.goOS.isNotEmpty()) envVars[GoConstants.Env.GOOS] = config.goOS
+        if (config.goArch.isNotEmpty()) envVars[GoConstants.Env.GOARCH] = config.goArch
+        envVars[GoConstants.Env.CGO_ENABLED] = if (config.cgoEnabled) "1" else "0"
+        if (config.goProxy.isNotEmpty()) envVars[GoConstants.Env.GOPROXY] = config.goProxy
 
         val sdkPath = buildResult.goRoot
         if (sdkPath.isNotEmpty()) {
-            envVars["GOROOT"] = sdkPath
+            envVars[GoConstants.Env.GOROOT] = sdkPath
             val oldPath = System.getenv("PATH") ?: ""
             val binPath = File(sdkPath, "bin").absolutePath
             envVars["PATH"] = "$binPath${File.pathSeparator}$oldPath"
@@ -213,8 +214,8 @@ class GoRunProcessHandler(
     }
 
     private fun emitSetupBlock(buildSucceeded: Boolean) {
-        notifyTextAvailable("GOROOT=${buildResult.goRoot} #gosetup\n", ProcessOutputTypes.SYSTEM)
-        notifyTextAvailable("GOPATH=${buildResult.goPath} #gosetup\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("${GoConstants.Env.GOROOT}=${buildResult.goRoot} #gosetup\n", ProcessOutputTypes.SYSTEM)
+        notifyTextAvailable("${GoConstants.Env.GOPATH}=${buildResult.goPath} #gosetup\n", ProcessOutputTypes.SYSTEM)
         notifyTextAvailable("${buildResult.buildCmdString} #gosetup\n", ProcessOutputTypes.SYSTEM)
         if (buildSucceeded) {
             notifyTextAvailable("${runCmd.commandLineString} #gosetup\n", ProcessOutputTypes.SYSTEM)

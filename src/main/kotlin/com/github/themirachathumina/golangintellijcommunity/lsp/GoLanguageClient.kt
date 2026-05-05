@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.lsp
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings
 import com.google.gson.JsonObject
 import com.intellij.openapi.project.Project
@@ -15,6 +16,6 @@ class GoLanguageClient(project: Project) : LanguageClientImpl(project) {
         val goplsSettings = JsonObject().apply {
             addProperty("semanticTokens", GoAppSettings.getInstance().state.semanticTokensEnabled)
         }
-        return JsonObject().apply { add("gopls", goplsSettings) }
+        return JsonObject().apply { add(GoConstants.Lsp.SERVER_ID, goplsSettings) }
     }
 }

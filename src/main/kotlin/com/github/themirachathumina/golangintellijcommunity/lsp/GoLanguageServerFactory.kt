@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.lsp
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.openapi.diagnostic.Logger
@@ -19,12 +20,12 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
     private val LOG = Logger.getInstance(GoLanguageServerFactory::class.java)
 
     override fun createConnectionProvider(@NotNull project: Project): StreamConnectionProvider {
-        LOG.info("[Go-Lang-Community] Creating connection provider for ${project.name}")
+        LOG.info("${GoConstants.Log.PREFIX} Creating connection provider for ${project.name}")
         return GoLanguageServer(project)
     }
 
     override fun createLanguageClient(@NotNull project: Project): LanguageClientImpl {
-        LOG.debug("[Go-Lang-Community] Creating language client for ${project.name}")
+        LOG.debug("${GoConstants.Log.PREFIX} Creating language client for ${project.name}")
         return GoLanguageClient(project)
     }
 
@@ -33,10 +34,10 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
             override fun initializeParams(@NotNull params: InitializeParams) {
                 super.initializeParams(params)
                 if (!GoAppSettings.getInstance().state.semanticTokensEnabled) {
-                    LOG.debug("[Go-Lang-Community] Semantic tokens disabled by settings — nulling capability")
+                    LOG.debug("${GoConstants.Log.PREFIX} Semantic tokens disabled by settings — nulling capability")
                     params.capabilities?.textDocument?.semanticTokens = null
                 } else {
-                    LOG.debug("[Go-Lang-Community] Semantic tokens enabled by settings")
+                    LOG.debug("${GoConstants.Log.PREFIX} Semantic tokens enabled by settings")
                 }
             }
 
@@ -44,7 +45,7 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
                 setSelectionRangeFeature(object : LSPSelectionRangeFeature() {
                     override fun isSelectionRangeSupported(file: PsiFile): Boolean {
                         val name = file.virtualFile?.name ?: return super.isSelectionRangeSupported(file)
-                        if (name == "go.mod" || name == "go.work") return false
+                        if (name == GoConstants.FileExtensions.MOD || name == GoConstants.FileExtensions.WORK) return false
                         return super.isSelectionRangeSupported(file)
                     }
                 })
@@ -56,12 +57,12 @@ class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementS
         if (!GoAppSettings.getInstance().state.lspEnabled) return false
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
         val isValid = sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)
-        LOG.debug("[Go-Lang-Community] Checking if Go language server is enabled for ${project.name}: $isValid")
+        LOG.debug("${GoConstants.Log.PREFIX} Checking if Go language server is enabled for ${project.name}: $isValid")
         return isValid
     }
 
     override fun setEnabled(enabled: Boolean, @NotNull project: Project) {
-        LOG.info("[Go-Lang-Community] Setting Go language server enabled: $enabled for ${project.name}")
+        LOG.info("${GoConstants.Log.PREFIX} Setting Go language server enabled: $enabled for ${project.name}")
         // Handled by project settings
     }
 }

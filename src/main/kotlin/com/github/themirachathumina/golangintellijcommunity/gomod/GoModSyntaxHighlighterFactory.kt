@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.gomod
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.lexer.EmptyLexer
 import com.intellij.lexer.Lexer
 import com.intellij.openapi.editor.colors.TextAttributesKey
@@ -12,7 +13,7 @@ import com.intellij.psi.tree.IElementType
 
 class GoModSyntaxHighlighterFactory : SyntaxHighlighterFactory() {
     override fun getSyntaxHighlighter(project: Project?, virtualFile: VirtualFile?): SyntaxHighlighter =
-        if (virtualFile?.name == "go.sum") NoOpSyntaxHighlighter else GoModSyntaxHighlighter()
+        if (virtualFile?.name == GoConstants.FileExtensions.SUM) NoOpSyntaxHighlighter else GoModSyntaxHighlighter()
 }
 
 private object NoOpSyntaxHighlighter : SyntaxHighlighterBase() {

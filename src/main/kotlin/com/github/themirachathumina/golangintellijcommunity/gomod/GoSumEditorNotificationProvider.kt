@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.gomod
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -12,7 +13,7 @@ import javax.swing.JComponent
 class GoSumEditorNotificationProvider : EditorNotificationProvider, DumbAware {
 
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {
-        if (file.name != "go.sum") return null
+        if (file.name != GoConstants.FileExtensions.SUM) return null
 
         return Function { fileEditor: FileEditor ->
             val panel = EditorNotificationPanel(fileEditor, EditorNotificationPanel.Status.Warning)

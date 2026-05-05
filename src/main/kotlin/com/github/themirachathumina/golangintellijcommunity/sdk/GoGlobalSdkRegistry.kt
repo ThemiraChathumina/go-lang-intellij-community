@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.*
 import com.intellij.openapi.diagnostic.Logger
@@ -40,7 +41,7 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
         ensureScanned()
         val invalid = myState.sdkPaths.filterNot { GoSdkUtils.isValidSdkHome(it) }
         if (invalid.isNotEmpty()) {
-            LOG.info("[Go-Lang-Community] Removing invalid SDK paths: $invalid")
+            LOG.info("${GoConstants.Log.PREFIX} Removing invalid SDK paths: $invalid")
             myState.sdkPaths.removeAll(invalid.toSet())
         }
         val paths = myState.sdkPaths.filter { path ->
@@ -72,7 +73,7 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
         if (myState.cachedGoOS.isNotEmpty()) return
         val exePath = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return
         try {
-            val process = ProcessBuilder(FileUtil.toSystemDependentName(exePath), "env", "GOOS", "GOARCH", "GOPROXY").start()
+            val process = ProcessBuilder(FileUtil.toSystemDependentName(exePath), "env", GoConstants.Env.GOOS, GoConstants.Env.GOARCH, GoConstants.Env.GOPROXY).start()
             val output = process.inputStream.bufferedReader().readText()
             if (process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0) {
                 val lines = output.trim().lines()
@@ -88,7 +89,7 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
 
     private fun ensureScanned() {
         if (!myState.hasScannedInitial) {
-            LOG.info("[Go-Lang-Community] First time registry access, scanning standard locations...")
+            LOG.info("${GoConstants.Log.PREFIX} First time registry access, scanning standard locations...")
             myState.hasScannedInitial = true
             
             ApplicationManager.getApplication().executeOnPooledThread {

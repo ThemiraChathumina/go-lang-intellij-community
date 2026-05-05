@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.notification.NotificationAction
@@ -23,12 +24,12 @@ object GoModReconciler {
             val rootDir = File(basePath)
 
             // .go-version is reconciled independently — it can coexist with go.work/go.mod
-            val goVersionFile = File(rootDir, ".go-version")
+            val goVersionFile = File(rootDir, GoConstants.FileExtensions.GO_VERSION)
             if (goVersionFile.exists()) {
                 reconcileGoVersionFile(project, newVersion, goVersionFile)
             }
 
-            val goWorkFile = File(rootDir, "go.work")
+            val goWorkFile = File(rootDir, GoConstants.FileExtensions.WORK)
             if (goWorkFile.exists()) {
                 reconcileWorkspace(project, newSdkPath, newVersion, goWorkFile)
                 // Also check individual go.mod files within the workspace for out-of-band use
@@ -48,15 +49,15 @@ object GoModReconciler {
                 .getNotificationGroup("Go Plugin Notifications")
                 .createNotification(
                     "Go Version Mismatch",
-                    ".go-version pins Go $pinnedVersion but selected SDK is Go $newVersion.",
+                    "${GoConstants.FileExtensions.GO_VERSION} pins Go $pinnedVersion but selected SDK is Go $newVersion.",
                     NotificationType.WARNING
                 )
-            notification.addAction(NotificationAction.createSimple("Update .go-version to $newVersion") {
+            notification.addAction(NotificationAction.createSimple("Update ${GoConstants.FileExtensions.GO_VERSION} to $newVersion") {
                 notification.expire()
                 try {
                     goVersionFile.writeText(newVersion)
                 } catch (e: Exception) {
-                    LOG.warn("Failed to update .go-version: ${e.message}")
+                    LOG.warn("Failed to update ${GoConstants.FileExtensions.GO_VERSION}: ${e.message}")
                 }
             })
             notification.notify(project)
@@ -103,7 +104,7 @@ object GoModReconciler {
         val allGoMods = rootDir.walkTopDown()
             .maxDepth(6)
             .onEnter { it.name != "vendor" && it.name != ".git" }
-            .filter { it.name == "go.mod" }
+            .filter { it.name == GoConstants.FileExtensions.MOD }
             .toList()
 
         for (goModFile in allGoMods) {
@@ -168,7 +169,7 @@ object GoModReconciler {
                 try {
                     val cmd = GeneralCommandLine(listOf(goExe) + args)
                         .withWorkDirectory(workDir)
-                        .withEnvironment("GOROOT", sdkPath)
+                        .withEnvironment(GoConstants.Env.GOROOT, sdkPath)
                     val handler = CapturingProcessHandler(cmd)
                     val output = handler.runProcess(30000)
                     if (output.exitCode != 0) {

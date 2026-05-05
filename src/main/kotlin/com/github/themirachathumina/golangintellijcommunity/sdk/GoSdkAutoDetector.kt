@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.sdk
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.notification.NotificationAction
@@ -22,7 +23,7 @@ class GoSdkAutoDetector : ProjectActivity {
     override suspend fun execute(project: Project) {
         val basePath = project.basePath ?: return
         val rootDir = File(basePath)
-        val isGoProject = rootDir.walkTopDown().maxDepth(2).any { it.name == "go.work" || it.name == "go.mod" || it.name.endsWith(".go") }
+        val isGoProject = rootDir.walkTopDown().maxDepth(2).any { it.name == GoConstants.FileExtensions.WORK || it.name == GoConstants.FileExtensions.MOD || it.name.endsWith(GoConstants.FileExtensions.GO) }
         if (!isGoProject) return
 
         val settings = GoProjectSettings.getInstance(project)
@@ -39,22 +40,22 @@ class GoSdkAutoDetector : ProjectActivity {
 
     private fun resolveSdkForProject(project: Project, rootDir: File) {
         // .go-version has highest precedence — used by goenv/asdf/mise to pin project toolchain
-        val goVersionFile = File(rootDir, ".go-version")
+        val goVersionFile = File(rootDir, GoConstants.FileExtensions.GO_VERSION)
         val requiredVersion: String? = if (goVersionFile.exists()) {
-            LOG.info("[Go-Lang-Community] Found .go-version at ${goVersionFile.absolutePath}, using its version")
+            LOG.info("${GoConstants.Log.PREFIX} Found .go-version at ${goVersionFile.absolutePath}, using its version")
             GoSdkUtils.readGoVersionFile(goVersionFile)
         } else {
             // go.work is authoritative for the whole workspace if present
-            val goWorkFile = File(rootDir, "go.work")
+            val goWorkFile = File(rootDir, GoConstants.FileExtensions.WORK)
             if (goWorkFile.exists()) {
-                LOG.info("[Go-Lang-Community] Found go.work at ${goWorkFile.absolutePath}, using its go directive")
+                LOG.info("${GoConstants.Log.PREFIX} Found go.work at ${goWorkFile.absolutePath}, using its go directive")
                 GoSdkUtils.readGoDirective(goWorkFile)
             } else {
                 // No go.work — collect all go.mod files and pick the highest required version
                 val allGoMods = rootDir.walkTopDown()
                     .maxDepth(6)
                     .onEnter { it.name != "vendor" && it.name != ".git" }
-                    .filter { it.name == "go.mod" }
+                    .filter { it.name == GoConstants.FileExtensions.MOD }
                     .toList()
                 allGoMods
                     .mapNotNull { GoSdkUtils.readGoDirective(it) }
@@ -65,8 +66,8 @@ class GoSdkAutoDetector : ProjectActivity {
         // GOTOOLCHAIN from the Go env file pins or constrains the toolchain version.
         // Format: "local" | "auto" | "go1.22.0" | "go1.22.0+auto"
         // If pinned to a specific version, treat it as the preferred SDK version.
-        val gotoolchain = GoSdkUtils.readGoEnvFile()["GOTOOLCHAIN"]
-            ?: System.getenv("GOTOOLCHAIN")
+        val gotoolchain = GoSdkUtils.readGoEnvFile()[GoConstants.Env.GOTOOLCHAIN]
+            ?: System.getenv(GoConstants.Env.GOTOOLCHAIN)
         val toolchainVersion = gotoolchain
             ?.let { Regex("""^go(\d+\.\d+(?:\.\d+)?)""").find(it)?.groupValues?.get(1) }
 
@@ -77,7 +78,7 @@ class GoSdkAutoDetector : ProjectActivity {
         if (toolchainVersion != null) {
             val toolchainMatch = allSdks.find { GoSdkUtils.retrieveGoVersion(it) == toolchainVersion }
             if (toolchainMatch != null) {
-                LOG.info("[Go-Lang-Community] Using SDK pinned by GOTOOLCHAIN=$gotoolchain: $toolchainMatch")
+                LOG.info("${GoConstants.Log.PREFIX} Using SDK pinned by GOTOOLCHAIN=$gotoolchain: $toolchainMatch")
                 assignAndStart(project, toolchainMatch)
                 return
             }
@@ -107,7 +108,7 @@ class GoSdkAutoDetector : ProjectActivity {
                     registry.addSdkPath(systemGo)
                     assignAndStart(project, systemGo)
                     return
-                } else if (compareVersions(sysVersion, "1.21") >= 0) {
+                } else if (compareVersions(sysVersion, GoConstants.Sdk.MIN_VERSION) >= 0) {
                     val downloadedRoot = runGoEnvGoroot(systemGo, rootDir)
                     if (downloadedRoot != null && GoSdkUtils.isValidSdkHome(downloadedRoot)) {
                         registry.addSdkPath(downloadedRoot)
@@ -139,7 +140,7 @@ class GoSdkAutoDetector : ProjectActivity {
     private fun runGoEnvGoroot(systemGoPath: String, workDir: File): String? {
         val goExe = GoSdkUtils.getGoExecutablePath(systemGoPath) ?: return null
         return try {
-            val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "env", "GOROOT").withWorkDirectory(workDir)
+            val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "env", GoConstants.Env.GOROOT).withWorkDirectory(workDir)
             val handler = CapturingProcessHandler(cmd)
             val output = handler.runProcess(30000)
             if (output.exitCode == 0) FileUtil.toSystemIndependentName(output.stdout.trim()) else null
@@ -170,7 +171,7 @@ class GoSdkAutoDetector : ProjectActivity {
                 if (requiredVersion != null) {
                     ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Downloading Go SDK...", true) {
                         override fun run(indicator: ProgressIndicator) {
-                            val targetVer = "go$requiredVersion"
+                            val targetVer = "${GoConstants.Sdk.VERSION_PREFIX}$requiredVersion"
                             val path = GoSdkDownloader.downloadSdk(targetVer, indicator)
                             if (path != null) {
                                 assignAndStart(project, path)
@@ -188,7 +189,7 @@ class GoSdkAutoDetector : ProjectActivity {
         if (GoSdkUtils.isGoplsInstalled(sdkHome)) {
             ApplicationManager.getApplication().invokeLater {
                 LOG.info("GoSdkAutoDetector: Starting gopls for ${project.name}")
-                LanguageServerManager.getInstance(project).start("gopls")
+                LanguageServerManager.getInstance(project).start(GoConstants.Lsp.SERVER_ID)
             }
         } else {
             promptGoplsInstallation(project, sdkHome)
@@ -226,14 +227,14 @@ class GoSdkAutoDetector : ProjectActivity {
 
                 try {
                     val cmd = GeneralCommandLine(FileUtil.toSystemDependentName(goExe), "install", "golang.org/x/tools/gopls@latest")
-                        .withEnvironment("GOROOT", FileUtil.toSystemDependentName(sdkHome))
+                        .withEnvironment(GoConstants.Env.GOROOT, FileUtil.toSystemDependentName(sdkHome))
                     val handler = CapturingProcessHandler(cmd)
                     val output = handler.runProcess(120 * 1000)
 
                     if (output.exitCode == 0) {
                         LOG.info("Successfully installed gopls.")
                         ApplicationManager.getApplication().invokeLater {
-                            LanguageServerManager.getInstance(project).start("gopls")
+                            LanguageServerManager.getInstance(project).start(GoConstants.Lsp.SERVER_ID)
                         }
                     } else {
                         LOG.warn("Failed to install gopls: ${output.stderr}")

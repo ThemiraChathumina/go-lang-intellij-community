@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test.coverage
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.run.GoRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
 import com.intellij.coverage.*
@@ -25,7 +26,7 @@ class GoCoverageEngine : CoverageEngine() {
             EP_NAME.extensionList.filterIsInstance<GoCoverageEngine>().first()
 
         fun isProductionGoFile(vFile: VirtualFile): Boolean =
-            vFile.extension == "go" && !vFile.name.endsWith("_test.go")
+            vFile.extension == GoConstants.FileExtensions.GO_EXT && !vFile.name.endsWith(GoConstants.FileExtensions.TEST_SUFFIX)
 
         fun isProductionGoFile(psiFile: PsiFile): Boolean =
             isProductionGoFile(psiFile.virtualFile ?: return false)
@@ -116,7 +117,7 @@ class GoCoverageEngine : CoverageEngine() {
 
     override fun getQualifiedNames(sourceFile: PsiFile): Set<String> {
         val vFile = sourceFile.virtualFile ?: return emptySet()
-        if (vFile.extension != "go") return emptySet()
+        if (vFile.extension != GoConstants.FileExtensions.GO_EXT) return emptySet()
 
         return setOf(vFile.path)
     }

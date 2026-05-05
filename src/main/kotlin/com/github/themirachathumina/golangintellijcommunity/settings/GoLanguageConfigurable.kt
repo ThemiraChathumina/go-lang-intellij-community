@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.settings
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.DialogPanel
@@ -76,11 +77,11 @@ class GoLanguageConfigurable : BoundConfigurable("Go") {
         for (project in ProjectManager.getInstance().openProjects) {
             val manager = LanguageServerManager.getInstance(project)
             when {
-                !isLspEnabled -> manager.stop("gopls")
-                !wasLspEnabled -> manager.start("gopls")
+                !isLspEnabled -> manager.stop(GoConstants.Lsp.SERVER_ID)
+                !wasLspEnabled -> manager.start(GoConstants.Lsp.SERVER_ID)
                 wasSemanticEnabled != isSemanticEnabled -> {
-                    manager.stop("gopls")
-                    manager.start("gopls")
+                    manager.stop(GoConstants.Lsp.SERVER_ID)
+                    manager.start(GoConstants.Lsp.SERVER_ID)
                 }
             }
         }

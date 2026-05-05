@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.wizard
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistry
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistryListener
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
@@ -197,20 +198,20 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
         val modulePath = modulePathField.text.trim()
         val initWorkspace = workspaceCheckBox.isSelected
 
-        LOG.info("[Go-Lang-Community] Setting up project: ${project.name}, type=${projectType?.displayName}, module=$modulePath")
+        LOG.info("${GoConstants.Log.PREFIX} Setting up project: ${project.name}, type=${projectType?.displayName}, module=$modulePath")
 
         com.intellij.openapi.application.runWriteAction {
             val selectedSdk = sdk
             if (selectedSdk != null) GoProjectSettings.getInstance(project).setSdkPath(selectedSdk)
 
-            val rawVersion = selectedSdk?.let { GoSdkUtils.retrieveGoVersion(it) } ?: "1.21"
+            val rawVersion = selectedSdk?.let { GoSdkUtils.retrieveGoVersion(it) } ?: GoConstants.Sdk.MIN_VERSION
             val modVersion = rawVersion.split(".").take(2).joinToString(".")
             val effectiveModule = modulePath.ifBlank { context.projectName }
             val projectDir = File(context.projectFileDirectory).also { if (!it.exists()) it.mkdirs() }
 
             try {
                 // go.mod
-                File(projectDir, "go.mod").takeIf { !it.exists() }
+                File(projectDir, GoConstants.FileExtensions.MOD).takeIf { !it.exists() }
                     ?.writeText("module $effectiveModule\n\ngo $modVersion\n")
 
                 // Source files based on project type
@@ -222,11 +223,11 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
 
                 // go.work
                 if (initWorkspace) {
-                    File(projectDir, "go.work").takeIf { !it.exists() }
+                    File(projectDir, GoConstants.FileExtensions.WORK).takeIf { !it.exists() }
                         ?.writeText("go $modVersion\n\nuse .\n")
                 }
             } catch (e: Exception) {
-                LOG.error("[Go-Lang-Community] Failed to initialize project files", e)
+                LOG.error("${GoConstants.Log.PREFIX} Failed to initialize project files", e)
             }
         }
     }

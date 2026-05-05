@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.GoFile
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionDecl
 import com.intellij.openapi.util.io.FileUtil
@@ -15,9 +16,9 @@ class GoTestFinder : TestFinder {
 
     override fun findTestsForClass(element: PsiElement): Collection<PsiElement> {
         val file = element.containingFile as? GoFile ?: return emptyList()
-        if (file.name.endsWith("_test.go")) return emptyList()
+        if (file.name.endsWith(GoConstants.FileExtensions.TEST_SUFFIX)) return emptyList()
 
-        val testFileName = file.name.removeSuffix(".go") + "_test.go"
+        val testFileName = file.name.removeSuffix(GoConstants.FileExtensions.GO) + GoConstants.FileExtensions.TEST_SUFFIX
         val testFile = file.containingDirectory?.findFile(testFileName) as? GoFile ?: return emptyList()
 
         if (element is GoFunctionDecl) {
@@ -32,9 +33,9 @@ class GoTestFinder : TestFinder {
 
     override fun findClassesForTest(element: PsiElement): Collection<PsiElement> {
         val file = element.containingFile as? GoFile ?: return emptyList()
-        if (!file.name.endsWith("_test.go")) return emptyList()
+        if (!file.name.endsWith(GoConstants.FileExtensions.TEST_SUFFIX)) return emptyList()
 
-        val sourceFileName = file.name.removeSuffix("_test.go") + ".go"
+        val sourceFileName = file.name.removeSuffix(GoConstants.FileExtensions.TEST_SUFFIX) + GoConstants.FileExtensions.GO
         val sourceFile = file.containingDirectory?.findFile(sourceFileName) as? GoFile ?: return emptyList()
 
         val function = PsiTreeUtil.getParentOfType(element, GoFunctionDecl::class.java)
@@ -53,6 +54,6 @@ class GoTestFinder : TestFinder {
 
     override fun isTest(element: PsiElement): Boolean {
         val file = element.containingFile ?: return false
-        return file.name.endsWith("_test.go")
+        return file.name.endsWith(GoConstants.FileExtensions.TEST_SUFFIX)
     }
 }

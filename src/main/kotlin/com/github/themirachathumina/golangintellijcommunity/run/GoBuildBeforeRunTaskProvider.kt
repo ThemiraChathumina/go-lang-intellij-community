@@ -1,5 +1,6 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
+import com.github.themirachathumina.golangintellijcommunity.GoConstants
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
 import com.intellij.execution.BeforeRunTask
@@ -114,20 +115,20 @@ fun buildGoApplication(
 
     val envVars = buildCmd.environment
     envVars.putAll(config.envVariables)
-    if (config.goOS.isNotEmpty()) envVars["GOOS"] = config.goOS
-    if (config.goArch.isNotEmpty()) envVars["GOARCH"] = config.goArch
-    envVars["CGO_ENABLED"] = if (config.cgoEnabled) "1" else "0"
-    if (config.goProxy.isNotEmpty()) envVars["GOPROXY"] = config.goProxy
+    if (config.goOS.isNotEmpty()) envVars[GoConstants.Env.GOOS] = config.goOS
+    if (config.goArch.isNotEmpty()) envVars[GoConstants.Env.GOARCH] = config.goArch
+    envVars[GoConstants.Env.CGO_ENABLED] = if (config.cgoEnabled) "1" else "0"
+    if (config.goProxy.isNotEmpty()) envVars[GoConstants.Env.GOPROXY] = config.goProxy
 
     val sysDepSdkPath = FileUtil.toSystemDependentName(sdkPath)
     if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
-        envVars["GOROOT"] = sysDepSdkPath
+        envVars[GoConstants.Env.GOROOT] = sysDepSdkPath
         val oldPath = System.getenv("PATH") ?: ""
         val binPath = File(sysDepSdkPath, "bin").absolutePath
         envVars["PATH"] = "$binPath${File.pathSeparator}$oldPath"
     }
 
-    val goPath = envVars["GOPATH"] ?: System.getenv("GOPATH") ?: ""
+    val goPath = envVars[GoConstants.Env.GOPATH] ?: System.getenv(GoConstants.Env.GOPATH) ?: ""
 
     val handler = CapturingProcessHandler(buildCmd)
     handlerCallback?.invoke(handler)
