@@ -12,6 +12,9 @@ import java.io.File
 object GoSdkVersion {
     private val LOG = Logger.getInstance(GoSdkVersion::class.java)
 
+    private val VERSION_FILE_REGEX = """^go(\d+\.\d+(\.\d+)?)""".toRegex()
+    private val VERSION_OUTPUT_REGEX = """go version go(\d+\.\d+(\.\d+)?)""".toRegex()
+
     private val versionCache = mutableMapOf<String, String>()
     private val pendingVersions = mutableSetOf<String>()
 
@@ -55,8 +58,7 @@ object GoSdkVersion {
         if (!versionFile.exists()) return null
         return try {
             val content = versionFile.readText().trim()
-            val regex = """^go(\d+\.\d+(\.\d+)?)""".toRegex()
-            regex.find(content)?.groupValues?.get(1)
+            VERSION_FILE_REGEX.find(content)?.groupValues?.get(1)
         } catch (e: Exception) {
             LOG.debug("Failed to read VERSION file at $sdkHomePath: ${e.message}")
             null
@@ -73,8 +75,7 @@ object GoSdkVersion {
 
             if (output.exitCode == 0) {
                 val stdout = output.stdout
-                val regex = """go version go(\d+\.\d+(\.\d+)?)""".toRegex()
-                val match = regex.find(stdout)
+                val match = VERSION_OUTPUT_REGEX.find(stdout)
                 val version = match?.groupValues?.get(1)
                 if (version != null) {
                     LOG.info("Detected Go version $version for $normalizedPath")

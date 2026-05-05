@@ -9,8 +9,10 @@ import com.intellij.psi.PsiElement
 
 class GoEscapeSequenceAnnotator : Annotator {
 
-    // Matches Go escapes: \a, \b, \f, \n, \r, \t, \v, \\, \', \", \ooo, \xhh, \uhhhh, \Uhhhhhhhh
-    private val validEscapeRegex = Regex("""\\[abfnrtv\\'"]|\\[0-7]{3}|\\x[0-9a-fA-F]{2}|\\u[0-9a-fA-F]{4}|\\U[0-9a-fA-F]{8}""")
+    companion object {
+        // Matches Go escapes: \a, \b, \f, \n, \r, \t, \v, \\, \', \", \ooo, \xhh, \uhhhh, \Uhhhhhhhh
+        private val VALID_ESCAPE_REGEX = Regex("""\\[abfnrtv\\'"]|\\[0-7]{3}|\\x[0-9a-fA-F]{2}|\\u[0-9a-fA-F]{4}|\\U[0-9a-fA-F]{8}""")
+    }
 
     override fun annotate(element: PsiElement, holder: AnnotationHolder) {
         val elementType = element.node.elementType
@@ -23,7 +25,7 @@ class GoEscapeSequenceAnnotator : Annotator {
             if (text.startsWith("`")) return
 
             // Find and highlight all valid escape sequences
-            validEscapeRegex.findAll(text).forEach { match ->
+            VALID_ESCAPE_REGEX.findAll(text).forEach { match ->
                 val startOffset = element.textRange.startOffset + match.range.first
                 val endOffset = element.textRange.startOffset + match.range.last + 1
                 val range = TextRange(startOffset, endOffset)

@@ -15,6 +15,10 @@ import com.intellij.psi.PsiDocumentManager
 class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new Go file", GoIcons.FILE), DumbAware {
     private val LOG = Logger.getInstance(GoCreateFileAction::class.java)
 
+    companion object {
+        private val NON_ALPHANUMERIC_REGEX = Regex("[^a-zA-Z0-9]")
+    }
+
     override fun buildDialog(project: Project, directory: PsiDirectory, builder: CreateFileFromTemplateDialog.Builder) {
         builder
             .setTitle("New Go File")
@@ -61,7 +65,7 @@ class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new G
     }
 
     private fun sanitizePackageName(name: String): String {
-        val sanitized = name.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
+        val sanitized = name.replace(NON_ALPHANUMERIC_REGEX, "").lowercase()
         val result = if (sanitized.isEmpty() || sanitized[0].isDigit()) "main" else sanitized
         LOG.debug("${GoConstants.Log.PREFIX} Sanitized package name for directory '$name': $result")
         return result

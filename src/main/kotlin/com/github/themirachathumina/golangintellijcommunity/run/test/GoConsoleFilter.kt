@@ -25,11 +25,13 @@ class GoConsoleFilter(
     private val workingDirectory: String = project.basePath ?: ""
 ) : Filter {
 
-    // Matches "some_file.go:42" – with or without a leading absolute path segment
-    private val pattern = Regex("""((?:[a-zA-Z]:[\\/])?[\w\-.\\/]+?\.go):(\d+)""")
+    companion object {
+        // Matches "some_file.go:42" – with or without a leading absolute path segment
+        private val FILE_LINE_PATTERN = Regex("""((?:[a-zA-Z]:[\\/])?[\w\-.\\/]+?\.go):(\d+)""")
+    }
 
     override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
-        val matches = pattern.findAll(line).toList()
+        val matches = FILE_LINE_PATTERN.findAll(line).toList()
         if (matches.isEmpty()) return null
 
         val textStartOffset = entireLength - line.length

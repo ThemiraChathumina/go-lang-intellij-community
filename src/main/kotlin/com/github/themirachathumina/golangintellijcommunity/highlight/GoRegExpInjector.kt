@@ -12,6 +12,11 @@ import org.intellij.lang.regexp.RegExpLanguage
 
 class GoRegExpInjector : MultiHostInjector {
 
+    companion object {
+        private val REGEX_VAR_ASSIGNMENT = Regex(".*\\b(pattern|regex|regexp|re)\\s*(:=|=).*")
+        private val REGEX_HEURISTIC = Regex("(\\\\[dDwWsS]|\\(\\?:|\\[[a-zA-Z]-|\\^.*\\$)")
+    }
+
     override fun getLanguagesToInject(registrar: MultiHostRegistrar, context: PsiElement) {
         if (context !is GoStringLiteral) return
 
@@ -33,14 +38,13 @@ class GoRegExpInjector : MultiHostInjector {
                 stmtText.contains("regexp.Match")
 
         // 2. Check if it's assigned to a common regex variable name
-        val isRegexVarAssignment = stmtText.matches(Regex(".*\\b(pattern|regex|regexp|re)\\s*(:=|=).*"))
+        val isRegexVarAssignment = stmtText.matches(REGEX_VAR_ASSIGNMENT)
 
         // 3. NEW: Smart Heuristic for Raw Strings
         // If it's a Go raw string (`...`) and contains obvious regex metacharacters
         // like \d, \w, (?:, or character ranges like [a-z], inject it automatically!
         val isRawString = text.startsWith("`") && text.endsWith("`")
-        val regexHeuristic = Regex("(\\\\[dDwWsS]|\\(\\?:|\\[[a-zA-Z]-|\\^.*\\$)")
-        val looksLikeRegex = isRawString && regexHeuristic.containsMatchIn(text)
+        val looksLikeRegex = isRawString && REGEX_HEURISTIC.containsMatchIn(text)
 
         // If ANY of these conditions are true, inject the RegExp language!
         if (isRegExpCall || isRegexVarAssignment || looksLikeRegex) {

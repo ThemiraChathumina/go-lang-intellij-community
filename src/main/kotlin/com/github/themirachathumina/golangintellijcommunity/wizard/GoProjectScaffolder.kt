@@ -4,6 +4,8 @@ import java.io.File
 
 object GoProjectScaffolder {
 
+    private val NON_IDENTIFIER_REGEX = Regex("[^a-z0-9_]")
+
     fun scaffold(projectType: GoProjectType, root: File, projectName: String, modulePath: String) {
         when (projectType) {
             GoProjectType.EXECUTABLE -> scaffoldExecutable(root)
@@ -73,5 +75,5 @@ object GoProjectScaffolder {
     }
 
     fun toGoIdentifier(name: String): String =
-        name.lowercase().replace(Regex("[^a-z0-9_]"), "_").trimStart('_').ifBlank { "pkg" }
+        name.lowercase().replace(NON_IDENTIFIER_REGEX, "_").trimStart('_').ifBlank { "pkg" }
 }

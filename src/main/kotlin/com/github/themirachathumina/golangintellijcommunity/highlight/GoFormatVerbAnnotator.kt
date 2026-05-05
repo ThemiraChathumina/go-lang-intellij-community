@@ -10,8 +10,10 @@ import com.intellij.psi.PsiElement
 
 class GoFormatVerbAnnotator : Annotator {
 
-    // This regex matches Go format verbs like %s, %d, %+v, %.2f, %05d, and %%
-    private val verbRegex = Regex("%[+\\- 0#]*\\d*(?:\\.\\d+)?[a-zA-Z%]")
+    companion object {
+        // Matches Go format verbs like %s, %d, %+v, %.2f, %05d, and %%
+        private val VERB_REGEX = Regex("%[+\\- 0#]*\\d*(?:\\.\\d+)?[a-zA-Z%]")
+    }
 
     override fun annotate(element: PsiElement, holder: AnnotationHolder) {
         // We only care about String Literals
@@ -19,7 +21,7 @@ class GoFormatVerbAnnotator : Annotator {
             val text = element.text
 
             // Find all formatting verbs inside the string
-            val matches = verbRegex.findAll(text)
+            val matches = VERB_REGEX.findAll(text)
 
             for (match in matches) {
                 // Calculate the exact offset in the editor

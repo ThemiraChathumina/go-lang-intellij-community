@@ -16,11 +16,15 @@ import com.intellij.psi.PsiElement
  */
 class GoSemanticAnnotator : Annotator {
 
+    companion object {
+        private val KEY_REGEX = Regex("""([a-zA-Z_][a-zA-Z0-9_]*):["]""")
+    }
+
     override fun annotate(element: PsiElement, holder: AnnotationHolder) {
         if (element !is GoTag) return
 
         val text = element.text
-        val keyRegex = Regex("""([a-zA-Z_][a-zA-Z0-9_]*):["]""")
+        val keyRegex = KEY_REGEX
 
         keyRegex.findAll(text).forEach { match ->
             val keyGroup = match.groups[1] ?: return@forEach

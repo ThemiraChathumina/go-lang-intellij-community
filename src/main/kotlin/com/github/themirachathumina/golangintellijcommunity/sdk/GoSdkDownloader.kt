@@ -14,6 +14,7 @@ import java.net.URI
 object GoSdkDownloader {
     private val LOG = Logger.getInstance(GoSdkDownloader::class.java)
     private val proxyLock = Any()
+    private val VERSION_TAG_REGEX = Regex("""^go(\d+\.\d+(\.\d+)?)""")
 
     data class GoRelease(val version: String, val stable: Boolean, val files: List<GoFile>)
     data class GoFile(val filename: String, val os: String, val arch: String, val kind: String)
@@ -26,7 +27,7 @@ object GoSdkDownloader {
             val releases: List<GoRelease> = Gson().fromJson(json, type)
             releases
                 .filter { release ->
-                    val version = Regex("""^go(\d+\.\d+(\.\d+)?)""").find(release.version)?.groupValues?.get(1)
+                    val version = VERSION_TAG_REGEX.find(release.version)?.groupValues?.get(1)
                     version != null && GoSdkVersion.isSupportedVersion(version)
                 }
                 .map { it.version }

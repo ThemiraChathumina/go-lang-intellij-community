@@ -19,6 +19,10 @@ import java.io.File
 class GoSdkAutoDetector : ProjectActivity {
     private val LOG = Logger.getInstance(GoSdkAutoDetector::class.java)
 
+    companion object {
+        private val GOTOOLCHAIN_VERSION_REGEX = Regex("""^go(\d+\.\d+(?:\.\d+)?)""")
+    }
+
     override suspend fun execute(project: Project) {
         val basePath = project.basePath ?: return
         val rootDir = File(basePath)
@@ -64,7 +68,7 @@ class GoSdkAutoDetector : ProjectActivity {
         val gotoolchain = GoEnvironmentReader.readGoEnvFile()[GoConstants.Env.GOTOOLCHAIN]
             ?: System.getenv(GoConstants.Env.GOTOOLCHAIN)
         val toolchainVersion = gotoolchain
-            ?.let { Regex("""^go(\d+\.\d+(?:\.\d+)?)""").find(it)?.groupValues?.get(1) }
+            ?.let { GOTOOLCHAIN_VERSION_REGEX.find(it)?.groupValues?.get(1) }
 
         val registry = GoGlobalSdkRegistry.getInstance()
         val allSdks = registry.getSdkPaths()

@@ -191,7 +191,7 @@ class GoTestJsonRetranslator(
                     "skip" -> emit("##teamcity[testIgnored name='$name' nodeId='$id' message='Test skipped'$finishTs]\n")
                 }
 
-                benchmarkLineRegex.findAll(rawOutputText).forEach { match ->
+                BENCHMARK_LINE_REGEX.findAll(rawOutputText).forEach { match ->
                     parseBenchmarkMatch(match)?.let { emitBenchStats(it, entry.displayName, id) }
                 }
 
@@ -227,9 +227,11 @@ class GoTestJsonRetranslator(
         return id
     }
 
-    private val benchmarkLineRegex = Regex(
-        """(?m)^(Benchmark\S+)\s+(\d+)\s+([\d.]+)\s+ns/op(?:\s+([\d.]+)\s+B/op)?(?:\s+([\d.]+)\s+allocs/op)?"""
-    )
+    companion object {
+        private val BENCHMARK_LINE_REGEX = Regex(
+            """(?m)^(Benchmark\S+)\s+(\d+)\s+([\d.]+)\s+ns/op(?:\s+([\d.]+)\s+B/op)?(?:\s+([\d.]+)\s+allocs/op)?"""
+        )
+    }
 
     private data class BenchmarkStats(
         val name: String,
@@ -240,7 +242,7 @@ class GoTestJsonRetranslator(
     )
 
     private fun parseBenchmarkStats(line: String): BenchmarkStats? {
-        val match = benchmarkLineRegex.find(line) ?: return null
+        val match = BENCHMARK_LINE_REGEX.find(line) ?: return null
         return parseBenchmarkMatch(match)
     }
 

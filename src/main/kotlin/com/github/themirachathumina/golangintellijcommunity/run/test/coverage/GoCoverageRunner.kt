@@ -22,6 +22,7 @@ class GoCoverageRunner : CoverageRunner() {
 
     companion object {
         const val ID = "GoCoverageRunner"
+        private val WHITESPACE_REGEX = Regex("\\s+")
 
         // Keyed by project base path → (absolute file path → statement stats).
         // Populated during parsing; read by GoCoverageAnnotator for decimal percentage display.
@@ -103,7 +104,7 @@ class GoCoverageRunner : CoverageRunner() {
                 ?: return@forEachLine
 
             val rest = line.substring(colonIdx + 1)   // e.g. "10.2,15.3 4 1"
-            val parts = rest.split(Regex("\\s+"))
+            val parts = rest.split(WHITESPACE_REGEX)
             if (parts.size < 3) return@forEachLine
 
             val numStmts = parts[1].toIntOrNull() ?: 1
