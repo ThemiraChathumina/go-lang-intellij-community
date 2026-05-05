@@ -6,7 +6,6 @@ import com.intellij.openapi.components.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.messages.Topic
-import java.util.concurrent.TimeUnit
 
 interface GoGlobalSdkRegistryListener {
     fun sdkRegistryChanged()
@@ -39,16 +38,15 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
 
     fun getSdkPaths(): Set<String> {
         ensureScanned()
-        val invalid = myState.sdkPaths.filterNot { GoSdkUtils.isValidSdkHome(it) }
+        val invalid = myState.sdkPaths.filterNot { GoSdkLocator.isValidSdkHome(it) }
         if (invalid.isNotEmpty()) {
             LOG.info("${GoConstants.Log.PREFIX} Removing invalid SDK paths: $invalid")
             myState.sdkPaths.removeAll(invalid.toSet())
         }
         val paths = myState.sdkPaths.filter { path ->
-            val version = GoSdkUtils.retrieveGoVersion(path)
-            version == null || GoSdkUtils.isSupportedVersion(version)
+            val version = GoSdkVersion.retrieveGoVersion(path)
+            version == null || GoSdkVersion.isSupportedVersion(version)
         }.toSet()
-        // Populate env cache from any valid SDK if not yet cached
         if (myState.cachedGoOS.isEmpty() && paths.isNotEmpty()) {
             refreshEnvCache(paths.first())
         }
@@ -57,7 +55,7 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
 
     fun addSdkPath(path: String) {
         val normalized = FileUtil.toSystemIndependentName(path)
-        if (GoSdkUtils.isValidSdkHome(normalized)) {
+        if (GoSdkLocator.isValidSdkHome(normalized)) {
             if (myState.sdkPaths.add(normalized)) {
                 refreshEnvCache(normalized)
                 ApplicationManager.getApplication().messageBus.syncPublisher(TOPIC).sdkRegistryChanged()
@@ -65,25 +63,17 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
         }
     }
 
-    /**
-     * Caches GOOS, GOARCH, GOPROXY by running `go env` via ProcessBuilder.
-     * Safe to call from any thread. Only updates if cache is currently empty.
-     */
     fun refreshEnvCache(sdkPath: String) {
         if (myState.cachedGoOS.isNotEmpty()) return
-        val exePath = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return
-        try {
-            val process = ProcessBuilder(FileUtil.toSystemDependentName(exePath), "env", GoConstants.Env.GOOS, GoConstants.Env.GOARCH, GoConstants.Env.GOPROXY).start()
-            val output = process.inputStream.bufferedReader().readText()
-            if (process.waitFor(5, TimeUnit.SECONDS) && process.exitValue() == 0) {
-                val lines = output.trim().lines()
-                if (lines.size >= 3) {
-                    myState.cachedGoOS = lines[0]
-                    myState.cachedGoArch = lines[1]
-                    myState.cachedGoProxy = lines[2]
-                }
-            }
-        } catch (_: Exception) {
+        val exePath = GoSdkLocator.getGoExecutablePath(sdkPath) ?: return
+        val env = GoEnvironmentReader.fetchGoEnv(exePath, GoConstants.Env.GOOS, GoConstants.Env.GOARCH, GoConstants.Env.GOPROXY)
+        val goos = env[GoConstants.Env.GOOS]
+        val goarch = env[GoConstants.Env.GOARCH]
+        val goproxy = env[GoConstants.Env.GOPROXY]
+        if (goos != null && goarch != null && goproxy != null) {
+            myState.cachedGoOS = goos
+            myState.cachedGoArch = goarch
+            myState.cachedGoProxy = goproxy
         }
     }
 
@@ -91,12 +81,11 @@ class GoGlobalSdkRegistry : PersistentStateComponent<GoGlobalSdkRegistry.State> 
         if (!myState.hasScannedInitial) {
             LOG.info("${GoConstants.Log.PREFIX} First time registry access, scanning standard locations...")
             myState.hasScannedInitial = true
-            
+
             ApplicationManager.getApplication().executeOnPooledThread {
-                val suggested = GoSdkUtils.suggestSdkHomePaths()
+                val suggested = GoSdkLocator.suggestSdkHomePaths()
                 suggested.forEach { path ->
-                    // Prime the version cache in background
-                    GoSdkUtils.retrieveGoVersion(path)
+                    GoSdkVersion.retrieveGoVersion(path)
                     addSdkPath(path)
                 }
             }

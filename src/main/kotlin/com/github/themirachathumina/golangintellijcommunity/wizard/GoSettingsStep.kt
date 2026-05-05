@@ -5,7 +5,8 @@ import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegis
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistryListener
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkDownloader
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkVersion
 import com.intellij.ide.wizard.AbstractNewProjectWizardStep
 import com.intellij.ide.wizard.NewProjectWizardStep
 import com.intellij.openapi.application.ApplicationManager
@@ -44,28 +45,24 @@ enum class GoProjectType(val displayName: String) {
 class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardStep(parent) {
     private val LOG = Logger.getInstance(GoSettingsStep::class.java)
 
-    // --- SDK ---
     private val sdkProperty = propertyGraph.property<String?>(null)
     private var sdk by sdkProperty
     private val sdkModel = DefaultComboBoxModel<String>()
     private val sdkComboBox = ComboBox(sdkModel)
     private val loader = AsyncProcessIcon("GoVersionFetch").apply { isVisible = false }
 
-    // --- Module path ---
     private val modulePathField = JTextField(30)
 
-    // --- Project type ---
     private val projectTypeProperty = propertyGraph.property<GoProjectType?>(GoProjectType.EXECUTABLE)
     private var projectType by projectTypeProperty
     private val projectTypeModel = DefaultComboBoxModel(GoProjectType.entries.toTypedArray())
     private val projectTypeComboBox = ComboBox(projectTypeModel)
 
-    // --- Workspace ---
     private val workspaceCheckBox = JCheckBox("Initialize as Go workspace (go.work)")
 
     init {
         sdkComboBox.renderer = textListCellRenderer {
-            it?.let { path -> "Go ${GoSdkUtils.retrieveGoVersion(path) ?: ""} ($path)" } ?: "No SDK"
+            it?.let { path -> "Go ${GoSdkVersion.retrieveGoVersion(path) ?: ""} ($path)" } ?: "No SDK"
         }
 
         projectTypeComboBox.renderer = textListCellRenderer {
@@ -85,7 +82,7 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
     private fun refreshSdkList(selectedPath: String? = null) {
         sdkModel.removeAllElements()
         val paths = GoGlobalSdkRegistry.getInstance().getSdkPaths()
-            .sortedByDescending { GoSdkUtils.retrieveGoVersion(it) ?: "" }
+            .sortedByDescending { GoSdkVersion.retrieveGoVersion(it) ?: "" }
         paths.forEach { sdkModel.addElement(it) }
         val target = selectedPath ?: paths.firstOrNull()
         if (target != null && paths.contains(target)) {
@@ -95,13 +92,11 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
     }
 
     override fun setupUI(builder: Panel) {
-        // Pre-fill module path with project name (projectName may be null early in wizard lifecycle)
         if (modulePathField.text.isNullOrBlank()) {
             modulePathField.text = context.projectName?.ifBlank { "mymodule" } ?: "mymodule"
         }
 
         with(builder) {
-            // SDK row
             row("Go SDK:") {
                 cell(sdkComboBox)
                     .bindItem(::sdk)
@@ -115,7 +110,7 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
                             descriptor.title = "Select Go SDK Directory"
                             FileChooser.chooseFile(descriptor, null, null) { file ->
                                 val path = file.path
-                                if (GoSdkUtils.isValidSdkHome(path)) {
+                                if (GoSdkLocator.isValidSdkHome(path)) {
                                     GoGlobalSdkRegistry.getInstance().addSdkPath(path)
                                     refreshSdkList(path)
                                 } else {
@@ -170,7 +165,6 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
                 cell(loader)
             }
 
-            // Module path row
             row("Module path:") {
                 cell(modulePathField)
                     .align(AlignX.FILL)
@@ -180,14 +174,12 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
                     }
             }
 
-            // Project type row
             row("Project type:") {
                 cell(projectTypeComboBox)
                     .bindItem(::projectType)
                     .align(AlignX.FILL)
             }
 
-            // Workspace checkbox
             row("") {
                 cell(workspaceCheckBox)
             }
@@ -204,24 +196,22 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
             val selectedSdk = sdk
             if (selectedSdk != null) GoProjectSettings.getInstance(project).setSdkPath(selectedSdk)
 
-            val rawVersion = selectedSdk?.let { GoSdkUtils.retrieveGoVersion(it) } ?: GoConstants.Sdk.MIN_VERSION
+            val rawVersion = selectedSdk?.let { GoSdkVersion.retrieveGoVersion(it) } ?: GoConstants.Sdk.MIN_VERSION
             val modVersion = rawVersion.split(".").take(2).joinToString(".")
             val effectiveModule = modulePath.ifBlank { context.projectName }
             val projectDir = File(context.projectFileDirectory).also { if (!it.exists()) it.mkdirs() }
 
             try {
-                // go.mod
                 File(projectDir, GoConstants.FileExtensions.MOD).takeIf { !it.exists() }
                     ?.writeText("module $effectiveModule\n\ngo $modVersion\n")
 
-                // Source files based on project type
-                when (projectType ?: GoProjectType.EXECUTABLE) {
-                    GoProjectType.EXECUTABLE -> scaffoldExecutable(projectDir)
-                    GoProjectType.LIBRARY    -> scaffoldLibrary(projectDir, project.name)
-                    GoProjectType.CLI        -> scaffoldCli(projectDir, project.name, effectiveModule)
-                }
+                GoProjectScaffolder.scaffold(
+                    projectType ?: GoProjectType.EXECUTABLE,
+                    projectDir,
+                    project.name,
+                    effectiveModule ?: project.name
+                )
 
-                // go.work
                 if (initWorkspace) {
                     File(projectDir, GoConstants.FileExtensions.WORK).takeIf { !it.exists() }
                         ?.writeText("go $modVersion\n\nuse .\n")
@@ -231,72 +221,4 @@ class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardSte
             }
         }
     }
-
-    // --- Scaffolding helpers ---
-
-    private fun scaffoldExecutable(root: File) {
-        File(root, "main.go").takeIf { !it.exists() }?.writeText(
-            """
-            package main
-
-            import "fmt"
-
-            func main() {
-                fmt.Println("Hello, World!")
-            }
-            """.trimIndent() + "\n"
-        )
-    }
-
-    private fun scaffoldLibrary(root: File, projectName: String) {
-        val pkgName = toGoIdentifier(projectName)
-        File(root, "$pkgName.go").takeIf { !it.exists() }?.writeText(
-            """
-            package $pkgName
-
-            // Hello returns a greeting for the given name.
-            func Hello(name string) string {
-                return "Hello, " + name + "!"
-            }
-            """.trimIndent() + "\n"
-        )
-    }
-
-    private fun scaffoldCli(root: File, projectName: String, modulePath: String) {
-        val pkgName = toGoIdentifier(projectName)
-
-        // cmd/<name>/main.go
-        val cmdDir = File(root, "cmd/$pkgName").also { it.mkdirs() }
-        File(cmdDir, "main.go").takeIf { !it.exists() }?.writeText(
-            """
-            package main
-
-            import (
-                "fmt"
-                "$modulePath/internal/$pkgName"
-            )
-
-            func main() {
-                fmt.Println($pkgName.Greeting())
-            }
-            """.trimIndent() + "\n"
-        )
-
-        // internal/<name>/<name>.go
-        val internalDir = File(root, "internal/$pkgName").also { it.mkdirs() }
-        File(internalDir, "$pkgName.go").takeIf { !it.exists() }?.writeText(
-            """
-            package $pkgName
-
-            // Greeting returns the application greeting.
-            func Greeting() string {
-                return "Hello from $projectName!"
-            }
-            """.trimIndent() + "\n"
-        )
-    }
-
-    /** Converts a project name to a valid Go package identifier (lowercase, underscores). */
-    private fun toGoIdentifier(name: String): String =
-        name.lowercase().replace(Regex("[^a-z0-9_]"), "_").trimStart('_').ifBlank { "pkg" }
 }

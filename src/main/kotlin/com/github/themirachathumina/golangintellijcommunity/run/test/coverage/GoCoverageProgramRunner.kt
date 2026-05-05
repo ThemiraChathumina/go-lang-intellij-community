@@ -5,7 +5,7 @@ import com.github.themirachathumina.golangintellijcommunity.run.GoCompilationSta
 import com.github.themirachathumina.golangintellijcommunity.run.GoRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.run.test.GoTestRunConfiguration
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageExecutor
 import com.intellij.coverage.CoverageRunnerData
@@ -114,7 +114,7 @@ class GoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         // Conversion is blocking — dispatch to a pooled thread so we don't block the EDT.
         ApplicationManager.getApplication().executeOnPooledThread {
             val sdkPath = GoProjectSettings.getInstance(runConfig.project).state.goSdkPath
-            val goExe   = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return@executeOnPooledThread
+            val goExe   = GoSdkLocator.getGoExecutablePath(sdkPath) ?: return@executeOnPooledThread
             val cmd = GeneralCommandLine(
                 FileUtil.toSystemDependentName(goExe),
                 "tool", "covdata", "textfmt",

@@ -27,7 +27,7 @@ object GoSdkDownloader {
             releases
                 .filter { release ->
                     val version = Regex("""^go(\d+\.\d+(\.\d+)?)""").find(release.version)?.groupValues?.get(1)
-                    version != null && GoSdkUtils.isSupportedVersion(version)
+                    version != null && GoSdkVersion.isSupportedVersion(version)
                 }
                 .map { it.version }
         } catch (e: Exception) {
@@ -95,12 +95,6 @@ object GoSdkDownloader {
         }
     }
 
-    /**
-     * Reads proxy settings from the Go env file and system environment variables
-     * (HTTPS_PROXY / HTTP_PROXY and their lowercase variants), temporarily applies
-     * them as Java system properties for the duration of [block], then restores the
-     * previous values. Synchronized so concurrent downloads don't corrupt each other.
-     */
     private fun <T> withProxyConfigured(block: () -> T): T {
         val proxyUrl = resolveProxyUrl() ?: return block()
 
@@ -128,9 +122,8 @@ object GoSdkDownloader {
         }
     }
 
-    /** Resolves the proxy URL to use, preferring the Go env file over system env vars. */
     private fun resolveProxyUrl(): String? {
-        val goEnv = GoSdkUtils.readGoEnvFile()
+        val goEnv = GoEnvironmentReader.readGoEnvFile()
         return goEnv["HTTPS_PROXY"]
             ?: goEnv["https_proxy"]
             ?: goEnv["HTTP_PROXY"]
@@ -141,7 +134,6 @@ object GoSdkDownloader {
             ?: System.getenv("http_proxy")
     }
 
-    /** Parses a proxy URL like "https://host:8080" into (host, port, scheme). */
     private fun parseProxyUrl(proxyUrl: String): Triple<String, Int, String>? {
         return try {
             val url = URI(if (proxyUrl.contains("://")) proxyUrl else "http://$proxyUrl").toURL()

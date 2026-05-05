@@ -2,7 +2,7 @@ package com.github.themirachathumina.golangintellijcommunity.run
 
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoGlobalSdkRegistry
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.*
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -14,8 +14,6 @@ import com.intellij.util.xmlb.annotations.Attribute
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XMap
 import org.jdom.Element
-
-enum class GoBuildMode { DEFAULT, DEBUG, RELEASE }
 
 class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     LocatableConfigurationBase<RunProfileState>(project, factory, name) {
@@ -100,7 +98,7 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
         }
 
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
-        if (sdkPath.isBlank() || !GoSdkUtils.isValidSdkHome(sdkPath)) {
+        if (sdkPath.isBlank() || !GoSdkLocator.isValidSdkHome(sdkPath)) {
             throw RuntimeConfigurationError("Go SDK is not configured for this project")
         }
     }
@@ -123,8 +121,6 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
         val cloned = super.clone() as GoRunConfiguration
         cloned.state = this.state.copy()
 
-        // Template may have been created before SDK cache was populated;
-        // re-check on every clone so new configs always get the latest values.
         val registry = GoGlobalSdkRegistry.getInstance()
         if (cloned.goOS.isEmpty()) cloned.goOS = registry.state.cachedGoOS
         if (cloned.goArch.isEmpty()) cloned.goArch = registry.state.cachedGoArch
@@ -197,7 +193,6 @@ class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: 
     init {
         workingDirectory = project.basePath ?: ""
 
-        // Pre-fill from globally cached Go env (populated during SDK detection)
         val registry = GoGlobalSdkRegistry.getInstance()
         if (registry.state.cachedGoOS.isEmpty()) {
             val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath

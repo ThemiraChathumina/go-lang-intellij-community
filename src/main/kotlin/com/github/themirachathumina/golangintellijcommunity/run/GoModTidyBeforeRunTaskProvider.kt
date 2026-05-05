@@ -1,7 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.run
 
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.execution.BeforeRunTask
 import com.intellij.execution.BeforeRunTaskProvider
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -38,7 +38,7 @@ class GoModTidyBeforeRunTaskProvider : BeforeRunTaskProvider<GoModTidyBeforeRunT
         if (configuration !is GoRunConfiguration) return false
 
         val sdkPath = GoProjectSettings.getInstance(configuration.project).state.goSdkPath
-        val goExe = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return false
+        val goExe = GoSdkLocator.getGoExecutablePath(sdkPath) ?: return false
 
         val commandLine = GeneralCommandLine(goExe, "mod", "tidy")
             .withWorkDirectory(configuration.workingDirectory)

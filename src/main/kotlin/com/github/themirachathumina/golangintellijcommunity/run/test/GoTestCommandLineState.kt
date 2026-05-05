@@ -1,7 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test
 
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageExecutor
@@ -60,7 +60,7 @@ class GoTestCommandLineState(
 
     override fun startProcess(): ProcessHandler {
         val sdkPath = GoProjectSettings.getInstance(config.project).state.goSdkPath
-        val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
+        val goExe = GoSdkLocator.getGoExecutablePath(sdkPath)
             ?: throw com.intellij.execution.ExecutionException(
                 "Go executable not found in SDK path: $sdkPath"
             )

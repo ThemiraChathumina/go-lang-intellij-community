@@ -3,16 +3,13 @@ package com.github.themirachathumina.golangintellijcommunity.lsp
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.Gson
+import com.intellij.openapi.diagnostic.Logger
 import org.eclipse.lsp4j.jsonrpc.messages.Message
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Intercepts all LSP messages via handleMessage (which receives both client→server
- * and server→client messages) and prints semantic token data as
- * "identifier → tokenType [modifiers]" lines.
- */
 class GoLspSemanticLogger {
 
+    private val LOG = Logger.getInstance(GoLspSemanticLogger::class.java)
     private val gson = Gson()
 
     @Volatile private var tokenTypes: List<String> = emptyList()
@@ -94,7 +91,7 @@ class GoLspSemanticLogger {
                 ?.getAsJsonObject("legend") ?: return
             tokenTypes     = legend.getAsJsonArray("tokenTypes")?.map  { it.asString } ?: emptyList()
             tokenModifiers = legend.getAsJsonArray("tokenModifiers")?.map { it.asString } ?: emptyList()
-            println("[SemanticTokens] Legend loaded: ${tokenTypes.size} types, ${tokenModifiers.size} modifiers")
+            LOG.debug("[SemanticTokens] Legend loaded: ${tokenTypes.size} types, ${tokenModifiers.size} modifiers")
             return
         }
 
@@ -108,7 +105,7 @@ class GoLspSemanticLogger {
         val lines    = fileContents[uri]
         val fileName = uri.substringAfterLast("/")
 
-        println("\n[SemanticTokens] $fileName")
+        LOG.debug("\n[SemanticTokens] $fileName")
         decode(data, lines)
     }
 
@@ -164,7 +161,7 @@ class GoLspSemanticLogger {
             } ?: "${line}:${char}"
 
             val modStr = if (mods.isEmpty()) "" else " [${mods.joinToString(", ")}]"
-            println("  $text → $typeName$modStr")
+            LOG.debug("  $text → $typeName$modStr")
         }
     }
 

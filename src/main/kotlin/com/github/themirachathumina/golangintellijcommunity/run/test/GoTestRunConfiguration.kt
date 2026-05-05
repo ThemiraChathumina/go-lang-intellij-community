@@ -1,7 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test
 
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.*
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -93,7 +93,7 @@ class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, na
         }
 
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
-        if (sdkPath.isBlank() || !GoSdkUtils.isValidSdkHome(sdkPath)) {
+        if (sdkPath.isBlank() || !GoSdkLocator.isValidSdkHome(sdkPath)) {
             throw RuntimeConfigurationError("Go SDK is not configured for this project")
         }
     }

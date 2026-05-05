@@ -1,7 +1,7 @@
 package com.github.themirachathumina.golangintellijcommunity.run.test
 
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnAction
@@ -36,7 +36,7 @@ class GoCleanTestCacheAction : AnAction("Clean Go Test Cache") {
 
     private fun cleanTestCache(project: Project) {
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
-        val goExe = GoSdkUtils.getGoExecutablePath(sdkPath)
+        val goExe = GoSdkLocator.getGoExecutablePath(sdkPath)
         if (goExe == null) {
             notify(project, "Go SDK not configured — cannot clean test cache.", NotificationType.WARNING)
             return

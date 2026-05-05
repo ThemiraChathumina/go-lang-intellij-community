@@ -1,8 +1,9 @@
 package com.github.themirachathumina.golangintellijcommunity.lsp
 
 import com.github.themirachathumina.golangintellijcommunity.GoConstants
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoEnvironmentReader
 import com.github.themirachathumina.golangintellijcommunity.sdk.GoProjectSettings
-import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkUtils
+import com.github.themirachathumina.golangintellijcommunity.sdk.GoSdkLocator
 import com.github.themirachathumina.golangintellijcommunity.settings.GoAppSettings
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.diagnostic.Logger
@@ -23,12 +24,12 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
         LOG.info("${GoConstants.Log.PREFIX} Initializing GoLanguageServer for project: ${project.name}")
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
 
-        val goplsExe = GoSdkUtils.getGoplsExecutablePath(if (sdkPath.isNotEmpty()) sdkPath else null) ?: GoSdkUtils.GOPLS_EXECUTABLE_NAME
+        val goplsExe = GoSdkLocator.getGoplsExecutablePath(if (sdkPath.isNotEmpty()) sdkPath else null) ?: GoSdkLocator.GOPLS_EXECUTABLE_NAME
         LOG.info("${GoConstants.Log.PREFIX} Using gopls executable: $goplsExe")
 
         val commandLine = GeneralCommandLine(FileUtil.toSystemDependentName(goplsExe), "serve")
 
-        if (sdkPath.isNotEmpty() && GoSdkUtils.isValidSdkHome(sdkPath)) {
+        if (sdkPath.isNotEmpty() && GoSdkLocator.isValidSdkHome(sdkPath)) {
             val sysDepSdkPath = FileUtil.toSystemDependentName(sdkPath)
             commandLine.withEnvironment(GoConstants.Env.GOROOT, sysDepSdkPath)
             val oldPath = System.getenv("PATH") ?: ""
@@ -36,14 +37,14 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
             commandLine.withEnvironment("PATH", "$binPath${File.pathSeparator}$oldPath")
         }
 
-        val effectiveGoPath = GoSdkUtils.resolveGoPath().map { FileUtil.toSystemDependentName(it) }.joinToString(File.pathSeparator)
+        val effectiveGoPath = GoEnvironmentReader.resolveGoPath().map { FileUtil.toSystemDependentName(it) }.joinToString(File.pathSeparator)
         val systemGoPath = System.getenv(GoConstants.Env.GOPATH) ?: ""
         if (effectiveGoPath != systemGoPath) {
             commandLine.withEnvironment(GoConstants.Env.GOPATH, effectiveGoPath)
             LOG.info("${GoConstants.Log.PREFIX} Setting GOPATH for gopls: $effectiveGoPath")
         }
 
-        val effectiveGoModCache = FileUtil.toSystemDependentName(GoSdkUtils.resolveGoModCache())
+        val effectiveGoModCache = FileUtil.toSystemDependentName(GoEnvironmentReader.resolveGoModCache())
         val systemGoModCache = System.getenv(GoConstants.Env.GOMODCACHE) ?: ""
         if (effectiveGoModCache != systemGoModCache) {
             commandLine.withEnvironment(GoConstants.Env.GOMODCACHE, effectiveGoModCache)
@@ -58,7 +59,6 @@ class GoLanguageServer(@NotNull project: Project) : OSProcessStreamConnectionPro
         return mapOf("semanticTokens" to true)
     }
 
-    // handleMessage is called for ALL messages — both client→server and server→client.
     override fun handleMessage(message: Message, languageServer: LanguageServer?, rootUri: VirtualFile?) {
         if (GoAppSettings.getInstance().state.logSemanticTokens) {
             semanticLogger.onMessage(message)

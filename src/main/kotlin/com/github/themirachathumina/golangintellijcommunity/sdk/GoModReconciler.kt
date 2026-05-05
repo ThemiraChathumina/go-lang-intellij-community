@@ -20,10 +20,9 @@ object GoModReconciler {
     fun reconcile(project: Project, newSdkPath: String) {
         ApplicationManager.getApplication().executeOnPooledThread {
             val basePath = project.basePath ?: return@executeOnPooledThread
-            val newVersion = GoSdkUtils.retrieveGoVersion(newSdkPath) ?: return@executeOnPooledThread
+            val newVersion = GoSdkVersion.retrieveGoVersion(newSdkPath) ?: return@executeOnPooledThread
             val rootDir = File(basePath)
 
-            // .go-version is reconciled independently — it can coexist with go.work/go.mod
             val goVersionFile = File(rootDir, GoConstants.FileExtensions.GO_VERSION)
             if (goVersionFile.exists()) {
                 reconcileGoVersionFile(project, newVersion, goVersionFile)
@@ -32,7 +31,6 @@ object GoModReconciler {
             val goWorkFile = File(rootDir, GoConstants.FileExtensions.WORK)
             if (goWorkFile.exists()) {
                 reconcileWorkspace(project, newSdkPath, newVersion, goWorkFile)
-                // Also check individual go.mod files within the workspace for out-of-band use
                 reconcileModules(project, newSdkPath, newVersion, rootDir, withinWorkspace = true)
             } else {
                 reconcileModules(project, newSdkPath, newVersion, rootDir, withinWorkspace = false)
@@ -41,7 +39,7 @@ object GoModReconciler {
     }
 
     private fun reconcileGoVersionFile(project: Project, newVersion: String, goVersionFile: File) {
-        val pinnedVersion = GoSdkUtils.readGoVersionFile(goVersionFile) ?: return
+        val pinnedVersion = GoModDirectiveReader.readGoVersionFile(goVersionFile) ?: return
         if (pinnedVersion == newVersion) return
 
         ApplicationManager.getApplication().invokeLater {
@@ -65,8 +63,8 @@ object GoModReconciler {
     }
 
     private fun reconcileWorkspace(project: Project, newSdkPath: String, newVersion: String, goWorkFile: File) {
-        val requiredVersion = GoSdkUtils.readGoDirective(goWorkFile) ?: return
-        val comparison = compareVersions(newVersion, requiredVersion)
+        val requiredVersion = GoModDirectiveReader.readGoDirective(goWorkFile) ?: return
+        val comparison = GoSdkVersion.compareVersions(newVersion, requiredVersion)
         val workspaceDir = goWorkFile.parentFile
 
         ApplicationManager.getApplication().invokeLater {
@@ -108,13 +106,11 @@ object GoModReconciler {
             .toList()
 
         for (goModFile in allGoMods) {
-            val requiredVersion = GoSdkUtils.readGoDirective(goModFile) ?: continue
-            val comparison = compareVersions(newVersion, requiredVersion)
+            val requiredVersion = GoModDirectiveReader.readGoDirective(goModFile) ?: continue
+            val comparison = GoSdkVersion.compareVersions(newVersion, requiredVersion)
             val moduleDir = goModFile.parentFile
             val moduleLabel = moduleDir.relativeTo(rootDir).path.ifEmpty { "root" }
 
-            // In workspace mode, only notify if the version diverges — go.work takes precedence
-            // for workspace builds, but the go.mod version still matters for out-of-workspace use.
             val workspaceNote = if (withinWorkspace)
                 " Note: go.work takes precedence inside the workspace, but this module's go.mod may matter when used outside it."
             else ""
@@ -151,21 +147,10 @@ object GoModReconciler {
         }
     }
 
-    private fun compareVersions(v1: String, v2: String): Int {
-        val parts1 = v1.split(".").map { it.toIntOrNull() ?: 0 }
-        val parts2 = v2.split(".").map { it.toIntOrNull() ?: 0 }
-        for (i in 0 until maxOf(parts1.size, parts2.size)) {
-            val p1 = parts1.getOrElse(i) { 0 }
-            val p2 = parts2.getOrElse(i) { 0 }
-            if (p1 != p2) return p1.compareTo(p2)
-        }
-        return 0
-    }
-
     private fun runModCommand(project: Project, sdkPath: String, args: List<String>, workDir: File) {
         ProgressManager.getInstance().run(object : Task.Backgroundable(project, "Updating go.mod...", true) {
             override fun run(indicator: ProgressIndicator) {
-                val goExe = GoSdkUtils.getGoExecutablePath(sdkPath) ?: return
+                val goExe = GoSdkLocator.getGoExecutablePath(sdkPath) ?: return
                 try {
                     val cmd = GeneralCommandLine(listOf(goExe) + args)
                         .withWorkDirectory(workDir)
