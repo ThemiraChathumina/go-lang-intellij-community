@@ -24,6 +24,11 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.execution.ParametersListUtil
 
+/*
+ * Prepares and starts the Go test process. Handles command line arguments for verbose, short, 
+ * and race modes, build tags, and coverage profiles. Integrates with the SMTestRunner for 
+ * IDE-integrated test results via a custom process handler.
+ */
 class GoTestCommandLineState(
     env: ExecutionEnvironment,
     private val config: GoTestRunConfiguration
@@ -65,6 +70,29 @@ class GoTestCommandLineState(
                 "Go executable not found in SDK path: $sdkPath"
             )
 
+        val commandLine = buildGoTestCommandLine(goExe)
+
+        val setupLines = buildList {
+            if (sdkPath.isNotEmpty()) add("GOROOT=$sdkPath")
+            add(commandLine.commandLineString)
+        }
+
+        val resultsService = GoTestResultsService.getInstance(config.project)
+        val onTestResult: (String, Boolean?) -> Unit = { testName, passed ->
+            val status = when (passed) {
+                true  -> GoTestResultsService.Status.PASSED
+                false -> GoTestResultsService.Status.FAILED
+                null  -> GoTestResultsService.Status.SKIPPED
+            }
+            resultsService.record(testName, status)
+        }
+
+        val handler = GoTestProcessHandler(commandLine, setupLines, onTestResult)
+        ProcessTerminatedListener.attach(handler)
+        return handler
+    }
+
+    internal fun buildGoTestCommandLine(goExe: String): GeneralCommandLine {
         val commandLine = GeneralCommandLine(goExe)
         commandLine.addParameter("test")
         commandLine.addParameter("-json")
@@ -160,24 +188,7 @@ class GoTestCommandLineState(
         commandLine.withWorkDirectory(FileUtil.toSystemDependentName(config.workingDirectory))
         commandLine.withEnvironment(config.envVariables)
 
-        val setupLines = buildList {
-            if (sdkPath.isNotEmpty()) add("GOROOT=$sdkPath")
-            add(commandLine.commandLineString)
-        }
-
-        val resultsService = GoTestResultsService.getInstance(config.project)
-        val onTestResult: (String, Boolean?) -> Unit = { testName, passed ->
-            val status = when (passed) {
-                true  -> GoTestResultsService.Status.PASSED
-                false -> GoTestResultsService.Status.FAILED
-                null  -> GoTestResultsService.Status.SKIPPED
-            }
-            resultsService.record(testName, status)
-        }
-
-        val handler = GoTestProcessHandler(commandLine, setupLines, onTestResult)
-        ProcessTerminatedListener.attach(handler)
-        return handler
+        return commandLine
     }
 
     private class GoTestProcessHandler(

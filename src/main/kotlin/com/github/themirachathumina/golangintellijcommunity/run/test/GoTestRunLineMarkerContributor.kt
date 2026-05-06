@@ -26,6 +26,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import javax.swing.Icon
 
+/*
+ * Contributes gutter icons (green/red/yellow status indicators) for Go tests, benchmarks, 
+ * and fuzz functions. Provides quick execution and status reporting directly from the editor margin.
+ */
 class GoTestRunLineMarkerContributor : RunLineMarkerContributor(), DumbAware {
     override fun getInfo(element: PsiElement): Info? {
         val file = element.containingFile

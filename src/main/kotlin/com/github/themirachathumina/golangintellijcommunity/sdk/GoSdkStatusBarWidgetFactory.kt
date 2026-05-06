@@ -8,6 +8,10 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 
+/*
+ * Factory that creates and manages the lifecycle of the GoSdkStatusBarWidget.
+ * Ensures the widget is available and enabled in the IDE status bar.
+ */
 class GoSdkStatusBarWidgetFactory : StatusBarWidgetFactory {
     private val LOG = Logger.getInstance(GoSdkStatusBarWidgetFactory::class.java)
 

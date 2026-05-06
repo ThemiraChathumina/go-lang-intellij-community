@@ -19,6 +19,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Action group that provides "Run" options in the context menu for Go tests.
+ * Consolidates various test execution actions (unit tests, fuzzing, benchmarks) 
+ * into a single submenu when multiple test kinds are available.
+ */
 class GoTestRunContextGroup : ActionGroup(), DumbAware {
 
     init {

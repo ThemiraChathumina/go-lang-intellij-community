@@ -7,6 +7,10 @@ import com.intellij.spellchecker.tokenizer.SpellcheckingStrategy
 import com.intellij.spellchecker.tokenizer.Tokenizer
 import com.intellij.psi.util.elementType
 
+/*
+ * Enables spell-checking in Go comments and string/rune literals.
+ * All other token types (identifiers, keywords, etc.) are excluded from spell checking.
+ */
 class GoSpellcheckingStrategy : SpellcheckingStrategy() {
     override fun getTokenizer(element: PsiElement): Tokenizer<*> {
         val type = element.elementType

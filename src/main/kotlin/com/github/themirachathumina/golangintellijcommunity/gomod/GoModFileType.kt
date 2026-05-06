@@ -4,6 +4,9 @@ import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.intellij.openapi.fileTypes.LanguageFileType
 import javax.swing.Icon
 
+/*
+ * File type singleton for Go module files (go.mod, go.work, go.sum).
+ */
 object GoModFileType : LanguageFileType(GoModLanguage) {
     override fun getName(): String = "Go Module File"
     override fun getDescription(): String = "Go module and workspace files (go.mod, go.work)"

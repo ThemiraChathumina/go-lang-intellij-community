@@ -9,6 +9,10 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
 import java.io.File
 
+/*
+ * Locates Go and gopls executables on the system. Scans standard installation paths, 
+ * environment variables, and project-specific SDK locations to find valid Go environments.
+ */
 class GoSdkLocator(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
     private val runner: ProcessRunner = RealProcessRunner()

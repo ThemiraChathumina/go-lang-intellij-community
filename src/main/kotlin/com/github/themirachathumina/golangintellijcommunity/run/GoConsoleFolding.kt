@@ -3,6 +3,10 @@ package com.github.themirachathumina.golangintellijcommunity.run
 import com.intellij.execution.ConsoleFolding
 import com.intellij.openapi.project.Project
 
+/*
+ * Folds internal Go setup log lines (tagged with #gosetup) in the run console
+ * so only user-visible output is shown by default.
+ */
 class GoConsoleFolding : ConsoleFolding() {
 
     // Both GoRunProcessHandler and GoTestProcessHandler tag their setup lines with

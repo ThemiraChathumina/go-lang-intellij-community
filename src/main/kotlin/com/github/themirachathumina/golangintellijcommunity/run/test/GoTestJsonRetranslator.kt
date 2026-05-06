@@ -14,6 +14,11 @@ private fun tcEscape(text: String): String = text
     .replace("[", "|[")
     .replace("]", "|]")
 
+/*
+ * Parses the JSON output from 'go test -json' and retranslates it into TeamCity service messages.
+ * This enables the IntelliJ test runner to display a live tree of test results, including 
+ * nested subtests and benchmark statistics.
+ */
 class GoTestJsonRetranslator(
     private val onTestResult: ((testName: String, passed: Boolean?) -> Unit)? = null
 ) {

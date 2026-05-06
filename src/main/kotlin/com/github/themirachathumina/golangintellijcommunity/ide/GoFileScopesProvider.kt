@@ -7,6 +7,10 @@ import com.intellij.psi.search.scope.packageSet.FilePatternPackageSet
 import com.intellij.psi.search.scope.packageSet.NamedScope
 import com.intellij.psi.search.scope.packageSet.UnionPackageSet
 
+/*
+ * Provides two custom file scopes: 'Go Test Files' (all *_test.go files) and 'Go Sum File' (go.sum),
+ * used for file coloring in the project tree.
+ */
 class GoFileScopesProvider(private val project: Project) : CustomScopesProvider {
 
     companion object {

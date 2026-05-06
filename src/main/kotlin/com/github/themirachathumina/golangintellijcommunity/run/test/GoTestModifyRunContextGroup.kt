@@ -18,6 +18,10 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Action group that provides "Modify Run Configuration" options in the context menu for Go tests.
+ * Allows users to quickly edit existing or newly created test configurations from the editor or project tree.
+ */
 class GoTestModifyRunContextGroup : ActionGroup(), DumbAware {
 
     init {

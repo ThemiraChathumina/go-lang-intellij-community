@@ -3,6 +3,10 @@ package com.github.themirachathumina.golangintellijcommunity.run
 import com.github.themirachathumina.golangintellijcommunity.GoIcons
 import com.intellij.execution.configurations.ConfigurationTypeBase
 
+/*
+ * ConfigurationType registration for Go run configurations, shown as "Go" in the Run/Debug
+ * Configurations dialog. Registers GoRunConfigurationFactory as its sole factory.
+ */
 class GoRunConfigurationType : ConfigurationTypeBase(
     "GoRunConfiguration",
     "Go",

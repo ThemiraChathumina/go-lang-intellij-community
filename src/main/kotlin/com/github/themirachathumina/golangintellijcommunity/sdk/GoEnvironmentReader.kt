@@ -9,6 +9,11 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
 import java.io.File
 
+/*
+ * Reads Go environment settings from the system and Go environment files.
+ * Resolves GOPATH, GOMODCACHE, and GOROOT by checking environment variables,
+ * standard locations, and executing 'go env' commands.
+ */
 class GoEnvironmentReader(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
     private val runner: ProcessRunner = RealProcessRunner()

@@ -6,6 +6,11 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 
+/*
+ * Application-level settings for the Go plugin. Persists global preferences 
+ * such as LSP enablement, semantic tokens toggle, and debug logging options 
+ * in 'goAppSettings.xml'.
+ */
 @Service(Service.Level.APP)
 @State(
     name = "GoAppSettings",

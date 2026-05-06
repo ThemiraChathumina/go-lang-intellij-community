@@ -11,6 +11,11 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Run configuration producer that creates a GoTestRunConfiguration specifically for Go benchmarks.
+ * Identifies benchmark functions (starting with "Benchmark") and sets the appropriate test kind 
+ * and target path to execute them.
+ */
 class GoBenchmarkRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunConfiguration>() {
 
     override fun getConfigurationFactory(): ConfigurationFactory =

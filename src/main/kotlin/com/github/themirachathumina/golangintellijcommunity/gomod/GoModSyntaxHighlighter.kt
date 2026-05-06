@@ -8,6 +8,10 @@ import com.intellij.openapi.fileTypes.SyntaxHighlighterBase
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
+/*
+ * Token-based syntax highlighter for go.mod and go.work files. Maps GoModTokenTypes
+ * to editor color attributes for keywords, strings, comments, versions, operators, and parentheses.
+ */
 class GoModSyntaxHighlighter : SyntaxHighlighterBase() {
 
     companion object {

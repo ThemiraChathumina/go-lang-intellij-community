@@ -2,6 +2,9 @@ package com.github.themirachathumina.golangintellijcommunity.gomod
 
 import com.intellij.psi.tree.IElementType
 
+/*
+ * IElementType constants for all tokens produced by GoModLexer.
+ */
 object GoModTokenTypes {
     @JvmField val KEYWORD     = IElementType("GOMOD_KEYWORD",      GoModLanguage)
     @JvmField val IDENTIFIER  = IElementType("GOMOD_IDENTIFIER",   GoModLanguage)

@@ -4,6 +4,10 @@ import com.intellij.openapi.util.IconLoader
 import com.intellij.ui.LayeredIcon
 import javax.swing.Icon
 
+/*
+ * Central icon registry for the plugin. Loads SVG icons from the resources directory and
+ * composes layered variants (go.mod, go.work, go.sum) with badge overlays.
+ */
 object GoIcons {
     @JvmField
     val FILE: Icon = IconLoader.getIcon("/icons/golang-icon.svg", GoIcons::class.java)

@@ -25,6 +25,10 @@ import com.redhat.devtools.lsp4ij.LanguageServerManager
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
 
+/*
+ * Status bar widget that displays the currently selected Go SDK version for the project.
+ * Provides a popup menu for switching between SDKs, adding local SDKs, or downloading new versions.
+ */
 class GoSdkStatusBarWidget(private val project: Project) : CustomStatusBarWidget {
     private val LOG = Logger.getInstance(GoSdkStatusBarWidget::class.java)
     private val label = JBLabel()

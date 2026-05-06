@@ -16,6 +16,11 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerManager
 
+/*
+ * Manages the installation and startup of the gopls language server. 
+ * Checks if gopls is installed and prompts the user to install it if it is missing, 
+ * then starts the language server for the project.
+ */
 class GoplsInstaller(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
     private val runner: ProcessRunner = RealProcessRunner()

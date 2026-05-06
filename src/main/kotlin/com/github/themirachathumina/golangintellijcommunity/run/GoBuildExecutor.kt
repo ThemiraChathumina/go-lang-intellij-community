@@ -11,6 +11,11 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import java.io.File
 
+/*
+ * Builds a Go application using `go build`, returning a GoBuildResult with the exit code,
+ * output, and path to the compiled binary. Handles coverage instrumentation, race detection,
+ * build tags, gcflags, and Go environment variables.
+ */
 data class GoBuildResult(
     val exitCode: Int,
     val stdout: String,

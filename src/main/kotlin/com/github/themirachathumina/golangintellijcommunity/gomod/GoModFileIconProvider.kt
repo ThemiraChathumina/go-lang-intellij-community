@@ -7,6 +7,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import javax.swing.Icon
 
+/*
+ * Provides custom icons for go.mod, go.work, and go.sum files in the project tree.
+ */
 class GoModFileIconProvider : FileIconProvider {
     override fun getIcon(file: VirtualFile, flags: Int, project: Project?): Icon? = when (file.name) {
         GoConstants.FileExtensions.MOD  -> GoIcons.MOD_FILE

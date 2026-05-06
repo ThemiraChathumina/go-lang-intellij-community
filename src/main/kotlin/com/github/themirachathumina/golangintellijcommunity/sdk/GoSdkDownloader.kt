@@ -13,6 +13,11 @@ import com.intellij.util.io.HttpRequests
 import java.io.File
 import java.net.URI
 
+/*
+ * Handles the discovery and downloading of Go SDKs from the official Go release server.
+ * Fetches available versions, identifies the correct archive for the current platform, 
+ * and performs the download and extraction process.
+ */
 class GoSdkDownloader(
     private val fs: FileSystemAccess = RealFileSystemAccess()
 ) {

@@ -15,6 +15,11 @@ import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XMap
 import org.jdom.Element
 
+/*
+ * Persistent run configuration for Go applications. Stores all build and execution options
+ * (target, working directory, env vars, build tags, race detection, cross-compilation targets, etc.)
+ * and supplies them to GoRunProfileState at execution time.
+ */
 class GoRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     LocatableConfigurationBase<RunProfileState>(project, factory, name) {
 

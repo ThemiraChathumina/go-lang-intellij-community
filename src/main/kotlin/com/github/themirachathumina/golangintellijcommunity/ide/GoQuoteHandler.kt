@@ -7,6 +7,10 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.highlighter.HighlighterIterator
 import com.github.themirachathumina.golangintellijcommunity.psi.GoTypes
 
+/*
+ * Quote handler for Go string and rune literals. Tells the IDE which tokens represent
+ * opening and closing quotes so it can auto-close them when typing.
+ */
 class GoQuoteHandler : QuoteHandler {
     private val LOG = Logger.getInstance(GoQuoteHandler::class.java)
 

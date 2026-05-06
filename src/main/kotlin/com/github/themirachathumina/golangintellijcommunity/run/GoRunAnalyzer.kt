@@ -8,6 +8,10 @@ import com.github.themirachathumina.golangintellijcommunity.psi.GoPackageName
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionDecl
 import com.github.themirachathumina.golangintellijcommunity.psi.GoFunctionName
 
+/*
+ * PSI-based utilities to determine whether a Go file belongs to the main package and declares func main().
+ * Used by run configuration producers to decide if a run action should be offered.
+ */
 object GoRunAnalyzer {
 
     fun isMainPackage(file: PsiFile): Boolean {

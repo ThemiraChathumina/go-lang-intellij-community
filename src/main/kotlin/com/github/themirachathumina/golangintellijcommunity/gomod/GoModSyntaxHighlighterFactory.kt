@@ -11,6 +11,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.tree.IElementType
 
+/*
+ * Factory that returns GoModSyntaxHighlighter for go.mod and go.work files.
+ * go.sum files receive a no-op highlighter since they are auto-generated.
+ */
 class GoModSyntaxHighlighterFactory : SyntaxHighlighterFactory() {
     override fun getSyntaxHighlighter(project: Project?, virtualFile: VirtualFile?): SyntaxHighlighter =
         if (virtualFile?.name == GoConstants.FileExtensions.SUM) NoOpSyntaxHighlighter else GoModSyntaxHighlighter()

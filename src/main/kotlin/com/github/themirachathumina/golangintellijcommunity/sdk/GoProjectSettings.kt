@@ -9,6 +9,11 @@ interface GoProjectSettingsListener {
     fun sdkChanged(newPath: String)
 }
 
+/*
+ * Project-level settings for Go, primarily storing the selected Go SDK path.
+ * Persists the SDK configuration in 'goProjectSettings.xml' and notifies 
+ * listeners when the SDK path is updated.
+ */
 @Service(Service.Level.PROJECT)
 @State(
     name = "GoProjectSettings",

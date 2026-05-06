@@ -12,6 +12,9 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.util.Key
 import javax.swing.Icon
 
+/*
+ * BeforeRunTask and provider that run `go generate ./...` before a Go run configuration executes.
+ */
 class GoGenerateBeforeRunTask(taskKey: Key<GoGenerateBeforeRunTask>) : BeforeRunTask<GoGenerateBeforeRunTask>(taskKey)
 
 class GoGenerateBeforeRunTaskProvider : BeforeRunTaskProvider<GoGenerateBeforeRunTask>() {

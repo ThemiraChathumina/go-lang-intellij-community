@@ -2,6 +2,10 @@ package com.github.themirachathumina.golangintellijcommunity.ide
 
 import com.intellij.lang.Commenter
 
+/*
+ * Commenter for Go files. Provides // for line comments and /* */ for block comments,
+ * enabling the Ctrl+/ and Ctrl+Shift+/ IDE shortcuts.
+ */
 class GoCommenter : Commenter {
     override fun getLineCommentPrefix(): String = "//"
 

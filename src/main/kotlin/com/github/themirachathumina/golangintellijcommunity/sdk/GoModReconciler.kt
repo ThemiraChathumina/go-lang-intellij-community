@@ -14,6 +14,11 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import java.io.File
 
+/*
+ * Reconciles the Go versions specified in 'go.mod', 'go.work', and '.go-version' files 
+ * with the currently selected project SDK. Provides notifications and automated actions 
+ * to update these files when a version mismatch is detected.
+ */
 object GoModReconciler {
     private val LOG = Logger.getInstance(GoModReconciler::class.java)
 

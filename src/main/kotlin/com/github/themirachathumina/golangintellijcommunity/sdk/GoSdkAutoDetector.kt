@@ -17,6 +17,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import java.io.File
 
+/*
+ * Automatically detects and configures a suitable Go SDK for newly opened projects.
+ * Scans for '.go-version', 'go.work', and 'go.mod' files to determine the required 
+ * Go version and attempts to match it against installed SDKs or suggests a download.
+ */
 class GoSdkAutoDetector(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
     private val runner: ProcessRunner = RealProcessRunner()

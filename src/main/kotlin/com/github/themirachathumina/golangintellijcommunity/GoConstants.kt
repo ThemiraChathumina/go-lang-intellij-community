@@ -1,5 +1,10 @@
 package com.github.themirachathumina.golangintellijcommunity
 
+/*
+ * Central repository of compile-time string constants used throughout the plugin:
+ * Go environment variable names, executable names, file extensions, log prefix,
+ * minimum SDK version, and LSP server ID.
+ */
 object GoConstants {
 
     object Env {

@@ -12,6 +12,9 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.util.Key
 import javax.swing.Icon
 
+/*
+ * BeforeRunTask and provider that run `go mod tidy` before a Go run configuration executes.
+ */
 class GoModTidyBeforeRunTask(taskKey: Key<GoModTidyBeforeRunTask>) : BeforeRunTask<GoModTidyBeforeRunTask>(taskKey)
 
 class GoModTidyBeforeRunTaskProvider : BeforeRunTaskProvider<GoModTidyBeforeRunTask>() {

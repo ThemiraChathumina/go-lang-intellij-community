@@ -11,6 +11,10 @@ import com.intellij.openapi.fileTypes.SyntaxHighlighterBase
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
+/*
+ * Lexer-based syntax highlighter for Go source files. Defines all text attribute keys and maps
+ * Go token types (keywords, operators, literals, comments, braces) to their respective colors.
+ */
 class GoSyntaxHighlighter : SyntaxHighlighterBase() {
 
     companion object {

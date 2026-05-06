@@ -8,6 +8,10 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.Consumer
 import java.awt.event.MouseEvent
 
+/*
+ * Status bar widget that shows a "Compiling…" message during a Go build and provides a cancel button.
+ * Install and remove it via the companion's install/remove helpers.
+ */
 class GoCompilationStatusWidget(
     private val message: String,
     private val onCancel: () -> Unit

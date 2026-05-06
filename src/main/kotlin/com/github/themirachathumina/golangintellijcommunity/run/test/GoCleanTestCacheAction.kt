@@ -16,7 +16,14 @@ import java.io.InputStreamReader
  * "Tools > Go > Clean Test Cache" — runs `go clean -testcache` in a background
  * task so the IDE stays responsive.  Notifies the user on completion or failure.
  */
-class GoCleanTestCacheAction : AnAction("Clean Go Test Cache") {
+class GoCleanTestCacheAction(
+    private val resolveGoExe: (sdkPath: String) -> String? = GoSdkLocator::getGoExecutablePath,
+    private val processLauncher: (command: List<String>) -> Pair<Int, String> = { cmd ->
+        val proc = ProcessBuilder(cmd).redirectErrorStream(true).start()
+        val out = proc.inputStream.bufferedReader().readText().trim()
+        proc.waitFor() to out
+    }
+) : AnAction("Clean Go Test Cache") {
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
@@ -34,20 +41,15 @@ class GoCleanTestCacheAction : AnAction("Clean Go Test Cache") {
         e.presentation.isEnabledAndVisible = project != null
     }
 
-    private fun cleanTestCache(project: Project) {
+    internal fun cleanTestCache(project: Project) {
         val sdkPath = GoProjectSettings.getInstance(project).state.goSdkPath
-        val goExe = GoSdkLocator.getGoExecutablePath(sdkPath)
+        val goExe = resolveGoExe(sdkPath)
         if (goExe == null) {
             notify(project, "Go SDK not configured — cannot clean test cache.", NotificationType.WARNING)
             return
         }
 
-        val process = ProcessBuilder(goExe, "clean", "-testcache")
-            .redirectErrorStream(true)
-            .start()
-
-        val output = BufferedReader(InputStreamReader(process.inputStream)).readText().trim()
-        val exitCode = process.waitFor()
+        val (exitCode, output) = processLauncher(listOf(goExe, "clean", "-testcache"))
 
         if (exitCode == 0) {
             notify(project, "Go test cache cleaned successfully.", NotificationType.INFORMATION)

@@ -9,6 +9,10 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testIntegration.TestFinder
 
+/*
+ * Navigates between Go source files and their corresponding test files (*_test.go).
+ * Provides navigation between functions and their associated test functions based on naming conventions.
+ */
 class GoTestFinder : TestFinder {
     override fun findSourceElement(from: PsiElement): PsiElement? {
         return PsiTreeUtil.getParentOfType(from, GoFunctionDecl::class.java) ?: from.containingFile

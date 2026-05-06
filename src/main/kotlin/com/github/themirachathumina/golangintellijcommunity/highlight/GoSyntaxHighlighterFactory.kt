@@ -5,6 +5,9 @@ import com.intellij.openapi.fileTypes.SyntaxHighlighterFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 
+/*
+ * Factory that creates a GoSyntaxHighlighter instance for any Go file.
+ */
 class GoSyntaxHighlighterFactory : SyntaxHighlighterFactory() {
     override fun getSyntaxHighlighter(project: Project?, virtualFile: VirtualFile?): SyntaxHighlighter {
         return GoSyntaxHighlighter()

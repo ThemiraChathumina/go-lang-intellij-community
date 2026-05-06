@@ -11,6 +11,11 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Run configuration producer that creates a GoTestRunConfiguration for Go fuzz tests.
+ * Identifies fuzz target functions (starting with "Fuzz") and configures the test run 
+ * to use the -fuzz flag for the specified target.
+ */
 class GoFuzzRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunConfiguration>() {
 
     override fun getConfigurationFactory(): ConfigurationFactory =

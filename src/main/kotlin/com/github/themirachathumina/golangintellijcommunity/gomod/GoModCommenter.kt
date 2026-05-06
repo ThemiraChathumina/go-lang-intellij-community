@@ -4,6 +4,10 @@ import com.intellij.lang.CodeDocumentationAwareCommenter
 import com.intellij.psi.PsiComment
 import com.intellij.psi.tree.IElementType
 
+/*
+ * Commenter for go.mod and go.work files. Only line comments (//) are supported;
+ * block and documentation comments return null.
+ */
 class GoModCommenter : CodeDocumentationAwareCommenter {
     override fun getLineCommentPrefix(): String = "//"
     override fun getBlockCommentPrefix(): String? = null

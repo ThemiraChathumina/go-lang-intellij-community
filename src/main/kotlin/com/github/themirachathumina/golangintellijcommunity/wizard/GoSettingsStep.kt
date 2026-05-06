@@ -42,6 +42,10 @@ enum class GoProjectType(val displayName: String) {
     CLI("CLI Application (cmd/ structure)")
 }
 
+/*
+ * Wizard step for Go-specific project settings. Allows users to select a Go SDK, 
+ * define the module path, choose a project type, and optionally initialize a Go workspace.
+ */
 class GoSettingsStep(parent: NewProjectWizardStep) : AbstractNewProjectWizardStep(parent) {
     private val LOG = Logger.getInstance(GoSettingsStep::class.java)
 

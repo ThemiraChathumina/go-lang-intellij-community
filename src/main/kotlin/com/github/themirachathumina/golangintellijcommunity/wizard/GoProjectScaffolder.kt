@@ -2,6 +2,11 @@ package com.github.themirachathumina.golangintellijcommunity.wizard
 
 import java.io.File
 
+/*
+ * Handles the initial file and directory generation for new Go projects. 
+ * Supports scaffolding for executables, libraries, and CLI applications with 
+ * appropriate package structures.
+ */
 object GoProjectScaffolder {
 
     private val NON_IDENTIFIER_REGEX = Regex("[^a-z0-9_]")

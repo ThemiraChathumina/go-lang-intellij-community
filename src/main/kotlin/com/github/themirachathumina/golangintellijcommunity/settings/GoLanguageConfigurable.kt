@@ -12,6 +12,11 @@ import com.redhat.devtools.lsp4ij.LanguageServerManager
 import javax.swing.AbstractButton
 import javax.swing.JCheckBox
 
+/*
+ * Provides the user interface for the Go settings page under Settings > Languages & Frameworks > Go.
+ * Allows users to toggle LSP, semantic tokens, and logging, and handles the application 
+ * of these settings across all open projects.
+ */
 class GoLanguageConfigurable : BoundConfigurable("Go") {
 
     private val settings = GoAppSettings.getInstance()

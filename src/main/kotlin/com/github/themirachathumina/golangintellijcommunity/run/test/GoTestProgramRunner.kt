@@ -17,6 +17,11 @@ import org.jetbrains.concurrency.AsyncPromise
 import org.jetbrains.concurrency.Promise
 import java.util.concurrent.atomic.AtomicReference
 
+/*
+ * Async program runner for Go test configurations. Executes Go tests using 'go test' 
+ * and handles the compilation status widget, process termination, and results display 
+ * in the IDE's test runner UI.
+ */
 class GoTestProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 
     override fun getRunnerId(): String = "GoTestProgramRunner"

@@ -10,6 +10,11 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import org.intellij.lang.regexp.RegExpLanguage
 
+/*
+ * Injects the IntelliJ RegExp language into Go string literals used as regular expressions.
+ * Injection is triggered when the string is passed to regexp.Compile/MustCompile/Match,
+ * assigned to a regex-named variable, or is a raw string with obvious regex metacharacters.
+ */
 class GoRegExpInjector : MultiHostInjector {
 
     companion object {

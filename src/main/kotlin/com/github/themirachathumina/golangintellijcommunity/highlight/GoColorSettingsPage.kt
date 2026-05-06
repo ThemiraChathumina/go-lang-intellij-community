@@ -8,6 +8,11 @@ import com.intellij.openapi.options.colors.ColorDescriptor
 import com.intellij.openapi.options.colors.ColorSettingsPage
 import javax.swing.Icon
 
+/*
+ * Color settings page for Go, shown under Settings > Editor > Color Scheme > Go.
+ * Lists all text attribute keys (lexer, PSI annotator, and LSP semantic tokens)
+ * and provides a live demo code snippet for the settings panel.
+ */
 class GoColorSettingsPage : ColorSettingsPage {
 
     companion object {

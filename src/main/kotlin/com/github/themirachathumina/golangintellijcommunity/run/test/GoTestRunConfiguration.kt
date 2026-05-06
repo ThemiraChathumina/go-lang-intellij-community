@@ -14,6 +14,11 @@ import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XMap
 import org.jdom.Element
 
+/*
+ * Persistent run configuration for Go tests. Stores test-specific settings such as 
+ * scope (file, package, directory, or function), build tags, race detection, 
+ * and verbose output preferences.
+ */
 class GoTestRunConfiguration(project: Project, factory: ConfigurationFactory, name: String) :
     LocatableConfigurationBase<RunProfileState>(project, factory, name) {
 

@@ -7,6 +7,11 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 
+/*
+ * PSI annotator that highlights valid escape sequences (\n, \t, \uXXXX, etc.)
+ * inside Go string and rune literals with the VALID_STRING_ESCAPE color attribute.
+ * Raw strings (backtick-delimited) are skipped because they do not process escapes.
+ */
 class GoEscapeSequenceAnnotator : Annotator {
 
     companion object {

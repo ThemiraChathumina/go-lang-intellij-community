@@ -11,6 +11,10 @@ import com.intellij.ui.EditorNotificationProvider
 import java.util.function.Function
 import javax.swing.JComponent
 
+/*
+ * Provides an editor notification banner when a Go file is opened but no Go SDK is 
+ * configured for the project. Offers a quick action to configure or download an SDK.
+ */
 class GoSdkEditorNotificationProvider : EditorNotificationProvider, DumbAware {
     private val LOG = Logger.getInstance(GoSdkEditorNotificationProvider::class.java)
 

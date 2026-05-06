@@ -17,6 +17,11 @@ import com.intellij.ui.dsl.builder.panel
 import javax.swing.JComponent
 import javax.swing.event.DocumentEvent
 
+/*
+ * Swing settings editor for GoTestRunConfiguration. Provides fields for 
+ * test kind, scope, target path, working directory, and other test-specific options 
+ * within the Run/Debug Configurations dialog.
+ */
 class GoTestSettingsEditor(private val project: Project) : SettingsEditor<GoTestRunConfiguration>() {
 
     private val testKindComboBox = ComboBox(GoTestKind.entries.toTypedArray()).apply {

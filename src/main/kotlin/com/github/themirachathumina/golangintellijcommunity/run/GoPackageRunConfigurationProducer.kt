@@ -9,6 +9,10 @@ import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 
+/*
+ * Run configuration producer that creates a GoRunConfiguration when the user right-clicks
+ * a directory containing a main package. Defers to test producers when the context is a test directory.
+ */
 class GoPackageRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConfiguration>() {
 
     override fun getConfigurationFactory(): ConfigurationFactory =

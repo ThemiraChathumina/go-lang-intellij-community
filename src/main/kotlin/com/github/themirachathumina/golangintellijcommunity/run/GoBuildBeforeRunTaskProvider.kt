@@ -8,6 +8,10 @@ import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.util.Key
 import javax.swing.Icon
 
+/*
+ * BeforeRunTask and provider that trigger a Go build step before a run configuration executes.
+ * The build result is stored in the ExecutionEnvironment for the run profile state to consume.
+ */
 class GoBuildBeforeRunTask(taskKey: Key<GoBuildBeforeRunTask>) : BeforeRunTask<GoBuildBeforeRunTask>(taskKey) {
     init { isEnabled = true }
 }

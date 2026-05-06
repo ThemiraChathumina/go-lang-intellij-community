@@ -3,6 +3,9 @@ package com.github.themirachathumina.golangintellijcommunity.run.test
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.openapi.project.Project
 
+/*
+ * Factory that creates new GoTestRunConfiguration instances for the Go test configuration type.
+ */
 class GoTestRunConfigurationFactory(type: GoTestRunConfigurationType) : ConfigurationFactory(type) {
     override fun createTemplateConfiguration(project: Project) =
         GoTestRunConfiguration(project, this, "Go Test")

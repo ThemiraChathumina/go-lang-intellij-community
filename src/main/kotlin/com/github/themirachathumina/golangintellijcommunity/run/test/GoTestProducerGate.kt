@@ -6,6 +6,11 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Manages the visibility and suppression of Go run/test configuration producers.
+ * Ensures that multiple producers don't create overlapping or duplicate actions in the context menu
+ * by coordinating which producer should handle a specific PSI element or directory.
+ */
 object GoTestProducerGate {
 
     private val bypass = ThreadLocal.withInitial { false }

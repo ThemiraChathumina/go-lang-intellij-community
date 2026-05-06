@@ -1,5 +1,10 @@
 package com.github.themirachathumina.golangintellijcommunity.util
 
+/*
+ * Mock implementation of FileSystemAccess for unit testing. 
+ * Provides an in-memory file system and environment variable store to simulate 
+ * OS-level interactions without touching the actual disk.
+ */
 class FakeFileSystemAccess(
     val files: MutableMap<String, String> = mutableMapOf(),
     val directories: MutableSet<String> = mutableSetOf(),

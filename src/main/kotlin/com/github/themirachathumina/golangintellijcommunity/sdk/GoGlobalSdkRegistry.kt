@@ -11,6 +11,11 @@ interface GoGlobalSdkRegistryListener {
     fun sdkRegistryChanged()
 }
 
+/*
+ * Application-level registry that tracks all detected and manually added Go SDKs.
+ * Persists the list of SDK paths and provides a central point for SDK discovery 
+ * and version management across all projects.
+ */
 @Service(Service.Level.APP)
 @State(
     name = "GoGlobalSdkRegistry",

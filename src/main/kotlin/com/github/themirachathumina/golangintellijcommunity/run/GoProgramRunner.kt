@@ -15,6 +15,10 @@ import org.jetbrains.concurrency.Promise
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+/*
+ * Async program runner for Go run configurations. Compiles the program on a background thread,
+ * shows a cancellable status widget, and hands the built binary to the run profile state.
+ */
 class GoProgramRunner : AsyncProgramRunner<RunnerSettings>() {
 
     override fun getRunnerId(): String = "GoProgramRunner"

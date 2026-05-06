@@ -4,6 +4,9 @@ import com.intellij.extapi.psi.PsiFileBase
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.psi.FileViewProvider
 
+/*
+ * PSI file node for Go source files. Returned by GoParserDefinition.createFile().
+ */
 class GoFile(viewProvider: FileViewProvider) : PsiFileBase(viewProvider, GoLanguage) {
 
     override fun getFileType(): FileType {

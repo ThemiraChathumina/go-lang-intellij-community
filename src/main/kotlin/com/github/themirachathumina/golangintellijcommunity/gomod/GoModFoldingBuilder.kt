@@ -7,6 +7,10 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 
+/*
+ * Adds code folding for parenthesised blocks in go.mod and go.work files
+ * (e.g. `require ( ... )`).
+ */
 class GoModFoldingBuilder : FoldingBuilderEx() {
 
     override fun buildFoldRegions(root: PsiElement, document: Document, quick: Boolean): Array<FoldingDescriptor> {

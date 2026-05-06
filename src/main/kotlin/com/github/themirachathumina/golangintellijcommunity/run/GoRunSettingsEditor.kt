@@ -22,6 +22,11 @@ import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.event.DocumentEvent
 
+/*
+ * Swing settings editor for GoRunConfiguration, shown in the Run/Debug Configurations dialog.
+ * Provides fields for run kind, target path, working directory, arguments, env vars, build options,
+ * cross-compilation targets, output path, stdin redirection, and timeout.
+ */
 class GoRunSettingsEditor(private val project: Project) : SettingsEditor<GoRunConfiguration>() {
 
     companion object {

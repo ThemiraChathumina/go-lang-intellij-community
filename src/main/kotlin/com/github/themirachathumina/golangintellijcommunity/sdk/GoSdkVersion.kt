@@ -10,6 +10,11 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import java.util.concurrent.ConcurrentHashMap
 
+/*
+ * Provides utilities for retrieving and comparing Go SDK versions. 
+ * Supports reading versions from VERSION files, executing 'go version', and 
+ * caching results for improved performance.
+ */
 class GoSdkVersion(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
     private val runner: ProcessRunner = RealProcessRunner()

@@ -6,6 +6,10 @@ import com.google.gson.JsonObject
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
 
+/*
+ * LSP language client for gopls. Overrides createSettings() to supply the gopls configuration
+ * (e.g. semanticTokens) when the server requests workspace/configuration.
+ */
 class GoLanguageClient(project: Project) : LanguageClientImpl(project) {
 
     /**

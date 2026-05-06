@@ -5,6 +5,10 @@ import com.intellij.lang.ASTNode
 import com.intellij.psi.LiteralTextEscaper
 import com.intellij.psi.PsiLanguageInjectionHost
 
+/*
+ * PSI mixin for Go string literals that enables language injection (e.g. RegExp inside backtick strings).
+ * Implements PsiLanguageInjectionHost so IntelliJ can embed other language fragments into Go strings.
+ */
 abstract class GoStringLiteralMixin(node: ASTNode) : ASTWrapperPsiElement(node), PsiLanguageInjectionHost {
 
     // Tells the IDE this string is allowed to accept language injections

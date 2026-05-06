@@ -6,6 +6,10 @@ import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.icons.AllIcons
 import com.intellij.psi.PsiElement
 
+/*
+ * Contributes a green Run gutter icon next to the `func main()` declaration in Go files
+ * that belong to package main, enabling one-click execution from the editor margin.
+ */
 class GoRunLineMarkerContributor : RunLineMarkerContributor() {
 
     override fun getInfo(element: PsiElement): Info? {

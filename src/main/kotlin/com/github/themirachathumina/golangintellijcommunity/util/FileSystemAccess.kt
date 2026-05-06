@@ -3,6 +3,11 @@ package com.github.themirachathumina.golangintellijcommunity.util
 import com.intellij.openapi.util.io.FileUtil
 import java.io.File
 
+/*
+ * Abstraction layer for file system operations. Defines the interface for 
+ * checking file existence, reading text, managing directories, and walking the file tree. 
+ * Allows the plugin to switch between real and mock file systems for testing.
+ */
 interface FileSystemAccess {
     fun exists(path: String): Boolean
     fun isDirectory(path: String): Boolean

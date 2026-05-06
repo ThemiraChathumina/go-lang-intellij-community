@@ -15,6 +15,10 @@ import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Code folding for Go source files. Folds function bodies { }, grouped import statements,
+ * struct type bodies, and interface type bodies.
+ */
 class GoFoldingBuilder : FoldingBuilderEx(), DumbAware {
     private val LOG = Logger.getInstance(GoFoldingBuilder::class.java)
 

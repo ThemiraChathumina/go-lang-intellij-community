@@ -21,6 +21,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 private fun toNative(path: String): String = FileUtil.toSystemDependentName(path)
 
+/*
+ * CommandLineState that prepares and starts the Go run process. Handles coverage-instrumented builds,
+ * environment variable injection, stdin redirection, and external terminal launches.
+ */
 class GoRunProfileState(
     env: ExecutionEnvironment,
     private val config: GoRunConfiguration

@@ -11,6 +11,11 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
+/*
+ * Run configuration producer that creates a GoTestRunConfiguration from the current context.
+ * Automatically detects whether to run a single test function, a subtest, an entire file, 
+ * or a package directory based on the user's cursor position or selection.
+ */
 class GoTestRunConfigurationProducer : LazyRunConfigurationProducer<GoTestRunConfiguration>() {
 
     override fun getConfigurationFactory(): ConfigurationFactory =

@@ -16,6 +16,11 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 import org.eclipse.lsp4j.InitializeParams
 import org.jetbrains.annotations.NotNull
 
+/*
+ * lsp4ij factory for the gopls language server. Creates the connection provider, language client,
+ * and client features; also implements enablement gating so gopls only starts when a valid Go SDK
+ * is configured.
+ */
 class GoLanguageServerFactory : LanguageServerFactory, LanguageServerEnablementSupport {
     private val LOG = Logger.getInstance(GoLanguageServerFactory::class.java)
 

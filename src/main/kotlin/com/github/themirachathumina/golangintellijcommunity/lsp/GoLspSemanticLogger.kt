@@ -7,6 +7,11 @@ import com.intellij.openapi.diagnostic.Logger
 import org.eclipse.lsp4j.jsonrpc.messages.Message
 import java.util.concurrent.ConcurrentHashMap
 
+/*
+ * Debug helper that decodes and logs gopls semantic token responses. Intercepts outgoing textDocument
+ * messages to maintain a live snapshot of each file's content, then resolves and logs each token
+ * with its type and modifiers.
+ */
 class GoLspSemanticLogger {
 
     private val LOG = Logger.getInstance(GoLspSemanticLogger::class.java)

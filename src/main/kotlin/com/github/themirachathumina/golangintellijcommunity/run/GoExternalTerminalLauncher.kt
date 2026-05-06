@@ -4,6 +4,10 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 
+/*
+ * Launches a compiled Go binary in the system's external terminal (Windows cmd, macOS Terminal,
+ * or Linux x-terminal-emulator), generating a wrapper .bat script on Windows.
+ */
 object GoExternalTerminalLauncher {
 
     fun create(exePath: String, config: GoRunConfiguration): GeneralCommandLine {

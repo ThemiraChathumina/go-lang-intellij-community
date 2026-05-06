@@ -5,6 +5,10 @@ import com.github.themirachathumina.golangintellijcommunity.util.RealFileSystemA
 import com.intellij.openapi.diagnostic.Logger
 import java.io.File
 
+/*
+ * Reads and parses Go version directives from 'go.mod', 'go.work', and '.go-version' files.
+ * Uses regular expressions to extract pinned Go versions and toolchain specifications.
+ */
 class GoModDirectiveReader(
     private val fs: FileSystemAccess = RealFileSystemAccess()
 ) {

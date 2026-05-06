@@ -14,6 +14,10 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IFileElementType
 import com.intellij.psi.tree.TokenSet
 
+/*
+ * Wires together all language-infrastructure pieces for Go: the lexer, parser,
+ * comment/string token sets, and the PSI file factory.
+ */
 class GoParserDefinition : ParserDefinition {
     companion object {
         val FILE = IFileElementType(GoLanguage)

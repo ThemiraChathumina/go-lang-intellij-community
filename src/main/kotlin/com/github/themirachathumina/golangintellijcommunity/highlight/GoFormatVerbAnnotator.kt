@@ -8,6 +8,10 @@ import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 
+/*
+ * PSI annotator that highlights fmt-style format verbs (%s, %d, %+v, etc.)
+ * inside Go string literals using the VALID_STRING_ESCAPE color attribute.
+ */
 class GoFormatVerbAnnotator : Annotator {
 
     companion object {

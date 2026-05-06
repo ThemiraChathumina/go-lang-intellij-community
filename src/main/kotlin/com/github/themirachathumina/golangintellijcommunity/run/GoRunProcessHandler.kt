@@ -8,6 +8,10 @@ import com.intellij.util.concurrency.AppExecutorUtil
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 
+/*
+ * ProcessHandler that emits Go build output (#gosetup lines) then launches and streams
+ * the compiled binary's I/O. Supports optional timeout-based process termination.
+ */
 class GoRunProcessHandler(
     private val buildResult: GoBuildResult,
     private val runCmd: GeneralCommandLine,

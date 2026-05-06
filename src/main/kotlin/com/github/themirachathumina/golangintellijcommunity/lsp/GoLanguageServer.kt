@@ -18,6 +18,11 @@ import org.eclipse.lsp4j.services.LanguageServer
 import org.jetbrains.annotations.NotNull
 import java.io.File
 
+/*
+ * Configures and starts the gopls language server process for a project. Sets GOROOT, PATH,
+ * GOPATH, and GOMODCACHE environment variables before launch, and optionally enables
+ * semantic tokens via initialization options.
+ */
 class GoLanguageServer(@NotNull project: Project, private val fs: FileSystemAccess = RealFileSystemAccess()) : OSProcessStreamConnectionProvider() {
     private val LOG = Logger.getInstance(GoLanguageServer::class.java)
     private val semanticLogger = GoLspSemanticLogger()

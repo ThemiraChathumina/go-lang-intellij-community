@@ -10,6 +10,10 @@ import com.intellij.ui.EditorNotificationProvider
 import java.util.function.Function
 import javax.swing.JComponent
 
+/*
+ * Shows a read-only warning banner in the editor whenever go.sum is opened,
+ * reminding the user that the file is managed automatically by Go.
+ */
 class GoSumEditorNotificationProvider : EditorNotificationProvider, DumbAware {
 
     override fun collectNotificationData(project: Project, file: VirtualFile): Function<in FileEditor, out JComponent?>? {

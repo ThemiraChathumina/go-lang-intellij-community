@@ -12,6 +12,10 @@ import com.intellij.psi.PsiFile
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiDocumentManager
 
+/*
+ * Action to create new Go files from templates (simple file, main file, test file).
+ * Sanitizes the package declaration in the created file to match the containing directory name.
+ */
 class GoCreateFileAction : CreateFileFromTemplateAction("Go File", "Create new Go file", GoIcons.FILE), DumbAware {
     private val LOG = Logger.getInstance(GoCreateFileAction::class.java)
 

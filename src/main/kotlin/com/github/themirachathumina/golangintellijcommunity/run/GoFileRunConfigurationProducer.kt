@@ -7,6 +7,10 @@ import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.openapi.util.Ref
 import com.intellij.psi.PsiElement
 
+/*
+ * Run configuration producer that creates a GoRunConfiguration when the user right-clicks
+ * a Go file that contains a main package with a func main().
+ */
 class GoFileRunConfigurationProducer : LazyRunConfigurationProducer<GoRunConfiguration>() {
 
     override fun getConfigurationFactory(): ConfigurationFactory =
