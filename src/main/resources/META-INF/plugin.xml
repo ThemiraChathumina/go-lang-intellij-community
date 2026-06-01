@@ -114,6 +114,11 @@
         <editorNotificationProvider implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoSumEditorNotificationProvider"/>
         <fileIconProvider implementation="com.github.themirachathumina.golangintellijcommunity.gomod.GoModFileIconProvider"/>
 
+        <toolWindow id="Go Packages"
+                    anchor="right"
+                    factoryClass="com.github.themirachathumina.golangintellijcommunity.packages.GoPackageToolWindowFactory"
+                    icon="/icons/golang-icon.svg"/>
+
         <customScopesProvider implementation="com.github.themirachathumina.golangintellijcommunity.ide.GoFileScopesProvider"/>
         <postStartupActivity implementation="com.github.themirachathumina.golangintellijcommunity.ide.GoFileColorStartupActivity"/>
 
