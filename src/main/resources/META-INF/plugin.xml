@@ -148,6 +148,26 @@
             <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFile"/>
         </action>
 
+        <!--
+          "Go Generate" submenu in the editor right-click and project-tree right-click.
+          Contains actions to generate gotests stubs at function, file, and package granularity.
+          The group hides itself automatically when none of its children apply to the context.
+        -->
+        <group id="Go.GenerateTestsGroup"
+               class="com.github.themirachathumina.golangintellijcommunity.run.test.GoGenerateTestsGroup">
+            <action id="Go.GenerateTestsForFunction"
+                    class="com.github.themirachathumina.golangintellijcommunity.run.test.GoGenerateTestsForFunctionAction"
+                    text="Generate Tests for Function"/>
+            <action id="Go.GenerateTestsForFile"
+                    class="com.github.themirachathumina.golangintellijcommunity.run.test.GoGenerateTestsForFileAction"
+                    text="Generate Tests for File"/>
+            <action id="Go.GenerateTestsForPackage"
+                    class="com.github.themirachathumina.golangintellijcommunity.run.test.GoGenerateTestsForPackageAction"
+                    text="Generate Tests for Package"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="RunContextGroup"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="RunContextGroup"/>
+        </group>
+
         <!-- Tools > Go > Clean Test Cache -->
         <group id="Go.ToolsMenu" text="Go" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>

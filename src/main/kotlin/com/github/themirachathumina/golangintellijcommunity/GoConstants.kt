@@ -22,6 +22,7 @@ object GoConstants {
     object Executables {
         const val GO = "go"
         const val GOPLS = "gopls"
+        const val GOTESTS = "gotests"
     }
 
     object FileExtensions {
