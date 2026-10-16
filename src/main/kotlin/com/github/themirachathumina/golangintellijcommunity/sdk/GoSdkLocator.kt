@@ -15,7 +15,8 @@ import java.io.File
  */
 class GoSdkLocator(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
-    private val runner: ProcessRunner = RealProcessRunner()
+    private val runner: ProcessRunner = RealProcessRunner(),
+    private val isWindows: Boolean = SystemInfo.isWindows
 ) {
     companion object {
         private val LOG = Logger.getInstance(GoSdkLocator::class.java)
@@ -136,7 +137,7 @@ class GoSdkLocator(
 
         scanVersionedDir(fs.combine(home, ".local/share/mise/installs/go"), prefix = "", suggestions)
 
-        if (SystemInfo.isWindows) {
+        if (isWindows) {
             listOf("C:\\Go", "C:\\Program Files\\Go").forEach {
                 LOG.debug("Checking Windows path: $it")
                 if (isValidSdkHome(it)) suggestions.add(it)

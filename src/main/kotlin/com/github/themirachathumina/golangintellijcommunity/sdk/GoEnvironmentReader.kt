@@ -16,7 +16,8 @@ import java.io.File
  */
 class GoEnvironmentReader(
     private val fs: FileSystemAccess = RealFileSystemAccess(),
-    private val runner: ProcessRunner = RealProcessRunner()
+    private val runner: ProcessRunner = RealProcessRunner(),
+    private val isWindows: Boolean = SystemInfo.isWindows
 ) {
     companion object {
         private val LOG = Logger.getInstance(GoEnvironmentReader::class.java)
@@ -34,7 +35,7 @@ class GoEnvironmentReader(
 
         val envFile = when {
             goenvVar != null -> goenvVar
-            SystemInfo.isWindows -> fs.combine(fs.getEnv("AppData") ?: return emptyMap(), "go/env")
+            isWindows -> fs.combine(fs.getEnv("AppData") ?: return emptyMap(), "go/env")
             else -> {
                 val xdgConfig = fs.getEnv("XDG_CONFIG_HOME")
                 if (xdgConfig != null) fs.combine(xdgConfig, "go/env")

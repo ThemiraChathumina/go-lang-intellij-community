@@ -15,7 +15,7 @@ class GoEnvironmentReaderTest {
             userHomePath = "/home/user",
             files = mutableMapOf("/home/user/.config/go/env" to "GOPATH=/home/user/go\nGOROOT=/usr/local/go\n")
         )
-        val reader = GoEnvironmentReader(fs)
+        val reader = GoEnvironmentReader(fs, isWindows = false)
         val env = reader.readGoEnvFile()
         assertEquals("/home/user/go", env["GOPATH"])
         assertEquals("/usr/local/go", env["GOROOT"])
@@ -39,7 +39,7 @@ class GoEnvironmentReaderTest {
             env = mutableMapOf("GOPATH" to "/env/gopath"),
             files = mutableMapOf("/home/user/.config/go/env" to "GOPATH=/file/gopath\n")
         )
-        val reader = GoEnvironmentReader(fs)
+        val reader = GoEnvironmentReader(fs, isWindows = false)
         val paths = reader.resolveGoPath()
         assertTrue(paths.contains("/file/gopath"))
         assertTrue(paths.contains("/env/gopath"))

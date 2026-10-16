@@ -58,7 +58,7 @@ class GoSdkLocatorTest {
             executables = mutableSetOf(goPath),
             directories = mutableSetOf("/usr/local/go", "/usr/local/go/bin")
         )
-        val locator = GoSdkLocator(fs = fs)
+        val locator = GoSdkLocator(fs = fs, isWindows = false)
         val suggestions = locator.suggestSdkHomePaths()
         assertTrue(suggestions.contains("/usr/local/go"))
     }
